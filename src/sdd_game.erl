@@ -55,14 +55,20 @@ realize_event(_EmptyState, start, InitialBoard) ->
 -include_lib("eunit/include/eunit.hrl").
 
 init_returnsHistoryWithInitialBoardAndCandidates_test() ->
-	{ok, History} = init(no_options),
-	State = sdd_history:state(History),
+	{ok, InitialHistory} = init(no_options),
+	State = sdd_history:state(InitialHistory),
 	?assertNot(State#state.board =:= undefined),
 	?assertNot(State#state.candidates =:= undefined),
 	?assertEqual(false, State#state.complete),
 
 	Board = State#state.board,
-	Past = sdd_history:past(History),
+	Past = sdd_history:past(InitialHistory),
 	?assertMatch([{_Time, start, Board}], Past).
+
+chat_addsChatMessageToHistory_test() ->
+	DummyHistory = sdd_history:new(fun realize_event/3),
+	{noreply, HistoryAfterChat} = handle_cast({chat, "Peter", "Hello"}, DummyHistory),
+	Past = sdd_history:past(HistoryAfterChat),
+	?assertMatch([{_Time, chat, {"Peter", "Hello"}}], Past).
 
 -endif.
