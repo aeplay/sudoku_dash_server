@@ -59,6 +59,10 @@ init_returnsHistoryWithInitialBoardAndCandidates_test() ->
 	State = sdd_history:state(History),
 	?assertNot(State#state.board =:= undefined),
 	?assertNot(State#state.candidates =:= undefined),
-	?assertEqual(false, State#state.complete).
+	?assertEqual(false, State#state.complete),
+
+	Board = State#state.board,
+	Past = sdd_history:past(History),
+	?assertMatch([{_Time, start, Board}], Past).
 
 -endif.
