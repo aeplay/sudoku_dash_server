@@ -19,6 +19,11 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
-
+init_returnsHistoryWithInitialBoardAndCandidates_test() ->
+	History = init(no_options),
+	State = sdd_history:state(History),
+	?assertNot(State#state.board =:= undefined),
+	?assertNot(State#state.candidates =:= undefined),
+	?assertEqual(false, State#state.complete).
 
 -endif.
