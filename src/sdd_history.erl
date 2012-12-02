@@ -12,7 +12,7 @@
 -module(sdd_history).
 
 %% API
--export([new/1, state/1, append/3, add_listener/4, remove_listener/2]).
+-export([new/1, state/1, past/1, append/3, add_listener/4, remove_listener/2]).
 
 %% Types and Records
 -record(history, {
@@ -38,6 +38,12 @@ new(RealizerFunction) ->
 
 state(History) ->
 	History#history.state.
+
+%% ------------------------------------------------------------------------------------- %%
+%% Returns past events as a list
+
+past(History) ->
+	History#history.past.
 
 %% ------------------------------------------------------------------------------------- %%
 %% Appends an event to the history's past, realizes it and notifies listeners
