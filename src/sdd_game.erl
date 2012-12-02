@@ -35,6 +35,13 @@ init(_Opts) ->
 	InitialHistory = sdd_history:append(EmptyHistory, start, InitialBoard),
 	{ok, InitialHistory}.
 
+%% ------------------------------------------------------------------------------------- %%
+%% Adds a chat message to the history
+
+handle_cast({chat, PlayerId, Message}, History) ->
+	NewHistory = sdd_history:append(History, chat, {PlayerId, Message}),
+	{noreply, NewHistory}.
+
 %%% =================================================================================== %%%
 %%% HISTORY CALLBACKS                                                                   %%%
 %%% =================================================================================== %%%
@@ -44,7 +51,11 @@ init(_Opts) ->
 
 realize_event(_EmptyState, start, InitialBoard) ->
 	InitialCandidates = sdd_logic:calculate_candidates(InitialBoard, ?CANDIDATE_SOPHISTICATION),
-	#state{board = InitialBoard, candidates = InitialCandidates}.
+	#state{board = InitialBoard, candidates = InitialCandidates};
+
+%% Does not change state for all other used events
+
+realize_event(State, chat, _) -> State.
 
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
