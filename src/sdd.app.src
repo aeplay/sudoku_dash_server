@@ -1,0 +1,8 @@
+{application, sdd, [
+	{description, ""},
+	{vsn, "1"},
+	{registered, []},
+	{applications, [kernel,stdlib]},
+	{mod, { sdd_app, []}},
+	{env, []}
+]}.
