@@ -71,6 +71,10 @@ realize_event(State, guess, {_PlayerId, Position, Number, {good}}) ->
 	Complete = sdd_logic:is_complete(NewBoard),
 	State#state{board = NewBoard, candidates = NewCandidates, complete = Complete};
 
+%% Does not change state for guesses that are not good
+
+realize_event(State, guess, {_, _, _, _}) -> State;
+
 %% Does not change state for all other used events
 
 realize_event(State, chat, _) -> State.
