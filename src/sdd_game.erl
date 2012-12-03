@@ -122,4 +122,27 @@ guess_updatesBoardOnCorrectGuess_test() ->
 	[LastEvent|_Rest] = sdd_history:past(HistoryAfterGuess),
 	?assertMatch({_Time, guess, {"Peter", 27, 1, {good}}}, LastEvent).
 
+guess_addsGuessToHistoryButLeavesBoardAloneOnInvalidGuess_test() ->
+	InitialBoard = array:from_list(
+		[4,1,6,5,2,0,8,9,3,
+		 5,9,2,8,3,6,1,4,7,
+		 8,7,3,4,9,1,2,6,5,
+		 0,4,8,2,6,5,3,7,9,
+		 6,5,7,3,1,9,4,8,2,
+		 2,3,9,7,8,4,6,5,1,
+		 3,6,1,9,5,8,7,2,4,
+		 7,8,5,1,4,2,9,0,6,
+		 9,2,4,6,7,3,5,1,8]
+	),
+	DummyHistory = sdd_history:new(fun realize_event/3),
+	InitialHistory = sdd_history:append(DummyHistory, start, InitialBoard),
+	InitialState = sdd_history:state(InitialHistory),
+	{noreply, HistoryAfterGuess} = handle_cast({guess, "Peter", {27, 3}}, InitialHistory),
+
+	StateAfterGuess = sdd_history:state(HistoryAfterGuess),
+	?assertEqual(StateAfterGuess, InitialState),
+
+	[LastEvent|_Rest] = sdd_history:past(HistoryAfterGuess),
+	?assertMatch({_Time, guess, {"Peter", 27, 3, {bad, _Conflicts}}}, LastEvent).
+
 -endif.
