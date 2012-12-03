@@ -40,6 +40,16 @@ init(_Opts) ->
 
 handle_cast({chat, PlayerId, Message}, History) ->
 	NewHistory = sdd_history:append(History, chat, {PlayerId, Message}),
+	{noreply, NewHistory};
+
+%% Handles a guess, looks if it was right and creates an according event
+%% If the game is now complete, starts timeout after which it is stopped
+
+handle_cast({guess, PlayerId, {Position, Number}}, History) ->
+	#state{board = Board, candidates = Candidates} = sdd_history:state(History),
+	Result = sdd_logic:check_guess(Position, Number, Board, Candidates),
+	GuessEventData = {PlayerId, Position, Number, Result},
+	NewHistory = sdd_history:append(History, guess, GuessEventData),
 	{noreply, NewHistory}.
 
 %%% =================================================================================== %%%
@@ -52,6 +62,14 @@ handle_cast({chat, PlayerId, Message}, History) ->
 realize_event(_EmptyState, start, InitialBoard) ->
 	InitialCandidates = sdd_logic:calculate_candidates(InitialBoard, ?CANDIDATE_SOPHISTICATION),
 	#state{board = InitialBoard, candidates = InitialCandidates};
+
+%% Update the board and candidates after a good guess, check if it is complete
+
+realize_event(State, guess, {_PlayerId, Position, Number, {good}}) ->
+	NewBoard = array:set(Position, Number, State#state.board),
+	NewCandidates = sdd_logic:calculate_candidates(NewBoard, ?CANDIDATE_SOPHISTICATION),
+	Complete = sdd_logic:is_complete(NewBoard),
+	State#state{board = NewBoard, candidates = NewCandidates, complete = Complete};
 
 %% Does not change state for all other used events
 
