@@ -47,15 +47,19 @@ handle_cast({chat, PlayerId, Message}, History) ->
 %% If the game is now complete, starts timeout after which it is stopped
 
 handle_cast({guess, PlayerId, {Position, Number}}, History) ->
-	#state{board = Board, candidates = Candidates} = sdd_history:state(History),
-	Result = sdd_logic:check_guess(Position, Number, Board, Candidates),
-	GuessEventData = {PlayerId, Position, Number, Result},
-	NewHistory = sdd_history:append(History, guess, GuessEventData),
-	case sdd_history:state(NewHistory) of
+	case sdd_history:state(History) of
 		#state{complete = true} ->
-			{noreply, NewHistory, ?TIMEOUT_AFTER_COMPLETE};
-		#state{complete = false} ->
-			{noreply, NewHistory}
+			{noreply, History};
+		#state{board = Board, candidates = Candidates, complete = false} ->
+			Result = sdd_logic:check_guess(Position, Number, Board, Candidates),
+			GuessEventData = {PlayerId, Position, Number, Result},
+			NewHistory = sdd_history:append(History, guess, GuessEventData),
+			case sdd_history:state(NewHistory) of
+				#state{complete = true} ->
+					{noreply, NewHistory, ?TIMEOUT_AFTER_COMPLETE};
+				#state{complete = false} ->
+					{noreply, NewHistory}
+			end
 	end.
 
 %%% =================================================================================== %%%
