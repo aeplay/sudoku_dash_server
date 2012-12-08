@@ -61,7 +61,8 @@ handle_cast({guess, PlayerId, {Position, Number}}, History) ->
 			NewHistory = sdd_history:append(History, guess, GuessEventData),
 			case sdd_history:state(NewHistory) of
 				#state{complete = true} ->
-					{noreply, NewHistory, ?TIMEOUT_AFTER_COMPLETE};
+					erlang:send_after(?TIMEOUT_AFTER_COMPLETE, self(), exit_complete),
+					{noreply, NewHistory};
 				#state{complete = false} ->
 					{noreply, NewHistory}
 			end
@@ -207,7 +208,7 @@ guess_ignoresGuessAfterComplete_test() ->
 
 	DummyHistory = sdd_history:new(fun realize_event/3),
 	InitialHistory = sdd_history:append(DummyHistory, start, InitialBoard),
-	{noreply, HistoryAfterCompletingGuess, ?TIMEOUT_AFTER_COMPLETE} = handle_cast({guess, "Peter", {27, 1}}, InitialHistory),
+	{noreply, HistoryAfterCompletingGuess} = handle_cast({guess, "Peter", {27, 1}}, InitialHistory),
 
 	{noreply, HistoryAfterNewGuess} = handle_cast({guess, "Peter", {27, 1}}, HistoryAfterCompletingGuess),
 	?assertEqual(HistoryAfterCompletingGuess, HistoryAfterNewGuess).
