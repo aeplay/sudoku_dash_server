@@ -175,4 +175,24 @@ guess_markGameAsCompleteAndTimeoutIfComplete_test() ->
 	StateAfterGuess = sdd_history:state(HistoryAfterGuess),
 	?assertEqual(true, StateAfterGuess#state.complete).
 
+guess_ignoresGuessAfterComplete_test() ->
+	InitialBoard = array:from_list(
+		[4,1,6,5,2,7,8,9,3,
+		 5,9,2,8,3,6,1,4,7,
+		 8,7,3,4,9,1,2,6,5,
+		 0,4,8,2,6,5,3,7,9,
+		 6,5,7,3,1,9,4,8,2,
+		 2,3,9,7,8,4,6,5,1,
+		 3,6,1,9,5,8,7,2,4,
+		 7,8,5,1,4,2,9,3,6,
+		 9,2,4,6,7,3,5,1,8]
+	),
+
+	DummyHistory = sdd_history:new(fun realize_event/3),
+	InitialHistory = sdd_history:append(DummyHistory, start, InitialBoard),
+	{noreply, HistoryAfterCompletingGuess, ?TIMEOUT_AFTER_COMPLETE} = handle_cast({guess, "Peter", {27, 1}}, InitialHistory),
+
+	{noreply, HistoryAfterNewGuess} = handle_cast({guess, "Peter", {27, 1}}, HistoryAfterCompletingGuess),
+	?assertEqual(HistoryAfterCompletingGuess, HistoryAfterNewGuess).
+
 -endif.
