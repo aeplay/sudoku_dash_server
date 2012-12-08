@@ -20,7 +20,12 @@
 
 %% Config
 -define(CANDIDATE_SOPHISTICATION, 3).
+
+-ifdef(TEST).
+-define(TIMEOUT_AFTER_COMPLETE, 10).
+-else.
 -define(TIMEOUT_AFTER_COMPLETE, 10000).
+-endif.
 
 %%% =================================================================================== %%%
 %%% GEN_SERVER CALLBACKS                                                                %%%
@@ -174,10 +179,18 @@ guess_markGameAsCompleteAndTimeoutIfComplete_test() ->
 
 	DummyHistory = sdd_history:new(fun realize_event/3),
 	InitialHistory = sdd_history:append(DummyHistory, start, InitialBoard),
-	{noreply, HistoryAfterGuess, ?TIMEOUT_AFTER_COMPLETE} = handle_cast({guess, "Peter", {27, 1}}, InitialHistory),
+	{noreply, HistoryAfterGuess} = handle_cast({guess, "Peter", {27, 1}}, InitialHistory),
 
 	StateAfterGuess = sdd_history:state(HistoryAfterGuess),
-	?assertEqual(true, StateAfterGuess#state.complete).
+	?assertEqual(true, StateAfterGuess#state.complete),
+
+	receive
+		exit_complete ->
+			?assert(true)
+	after
+		?TIMEOUT_AFTER_COMPLETE + 100 ->
+			?assert(false)
+	end.
 
 guess_ignoresGuessAfterComplete_test() ->
 	InitialBoard = array:from_list(
