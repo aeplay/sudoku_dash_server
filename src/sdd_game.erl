@@ -20,6 +20,7 @@
 
 %% Config
 -define(CANDIDATE_SOPHISTICATION, 3).
+-define(TIMEOUT_AFTER_COMPLETE, 10000).
 
 %%% =================================================================================== %%%
 %%% GEN_SERVER CALLBACKS                                                                %%%
@@ -50,7 +51,12 @@ handle_cast({guess, PlayerId, {Position, Number}}, History) ->
 	Result = sdd_logic:check_guess(Position, Number, Board, Candidates),
 	GuessEventData = {PlayerId, Position, Number, Result},
 	NewHistory = sdd_history:append(History, guess, GuessEventData),
-	{noreply, NewHistory}.
+	case sdd_history:state(NewHistory) of
+		#state{complete = true} ->
+			{noreply, NewHistory, ?TIMEOUT_AFTER_COMPLETE};
+		#state{complete = false} ->
+			{noreply, NewHistory}
+	end.
 
 %%% =================================================================================== %%%
 %%% HISTORY CALLBACKS                                                                   %%%
