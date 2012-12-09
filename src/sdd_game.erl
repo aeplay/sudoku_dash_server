@@ -61,7 +61,7 @@ handle_cast({guess, PlayerId, {Position, Number}}, History) ->
 			NewHistory = sdd_history:append(History, guess, GuessEventData),
 			case sdd_history:state(NewHistory) of
 				#state{complete = true} ->
-					erlang:send_after(?TIMEOUT_AFTER_COMPLETE, self(), exit_complete),
+					erlang:send_after(?TIMEOUT_AFTER_COMPLETE, self(), stop_complete),
 					{noreply, NewHistory};
 				#state{complete = false} ->
 					{noreply, NewHistory}
@@ -71,7 +71,7 @@ handle_cast({guess, PlayerId, {Position, Number}}, History) ->
 %% ------------------------------------------------------------------------------------- %%
 %% Stops a game if it is complete
 
-handle_info(exit_complete, History) ->
+handle_info(stop_complete, History) ->
 	{stop, complete, History}.
 
 %%% =================================================================================== %%%
@@ -192,7 +192,7 @@ guess_markGameAsCompleteAndTimeoutIfComplete_test() ->
 	?assertEqual(true, StateAfterGuess#state.complete),
 
 	receive
-		exit_complete ->
+		stop_complete ->
 			?assert(true)
 	after
 		?TIMEOUT_AFTER_COMPLETE + 100 ->
@@ -220,6 +220,6 @@ guess_ignoresGuessAfterComplete_test() ->
 	?assertEqual(HistoryAfterCompletingGuess, HistoryAfterNewGuess).
 
 game_stopsWhenRecievingCompleteTimeout_test() ->
-	?assertEqual({stop, complete, dummy_history}, handle_info(exit_complete, dummy_history)).
+	?assertEqual({stop, complete, dummy_history}, handle_info(stop_complete, dummy_history)).
 
 -endif.
