@@ -12,7 +12,7 @@
 -module(sdd_history).
 
 %% API
--export([new/1, state/1, past/1, append/3, add_listener/3, remove_listener/2]).
+-export([new/1, state/1, past/1, append/3, add_listener/3]).
 
 %% Types and Records
 -record(history, {
@@ -49,17 +49,7 @@ past(History) ->
 %% Appends an event to the history's past, realizes it and notifies listeners
 
 append(History, EventType, EventData) ->
-	Event = {now(), EventType, EventData},
-	NewPast = [Event|History#history.past],
-	RealizerFunction = History#history.realizer_function,
-	NewState = RealizerFunction(History#history.state, EventType, EventData),
-
-	lists:foreach(fun(ListenerName) ->
-		ListenerFunction = dict:fetch(ListenerName, History#history.listeners),
-		ListenerFunction(event, Event)
-	end, dict:fetch_keys(History#history.listeners)),
-
-	History#history{past = NewPast, state = NewState}.
+	ok.
 
 %% ------------------------------------------------------------------------------------- %%
 %% Adds a new listener. The listener can be synchronized by replaying the whole past for
@@ -79,13 +69,6 @@ add_listener(History, ListenerFunction, SynchronizationType) ->
 	end,
 
 	NewListeners = [ListenerFunction|History#history.listeners],
-	History#history{listeners = NewListeners}.
-
-%% ------------------------------------------------------------------------------------- %%
-%% Removes an existing listener.
-
-remove_listener(History, ListenerName) ->
-	NewListeners = dict:erase(ListenerName, History#history.listeners),
 	History#history{listeners = NewListeners}.
 
 %%% =================================================================================== %%%
