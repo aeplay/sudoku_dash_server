@@ -127,5 +127,15 @@ add_listener_canSyncByReplayingPast_test() ->
 	after 10 -> ?assert(false)
 	end.
 
+add_listener_canSyncByTellingState_test() ->
+	ListenerFunction = fun(state, State) ->
+		self() ! State
+	end,
+
+	add_listener(#history{state = dummy}, ListenerFunction, tell_state),
+
+	receive dummy -> ?assert(true)
+	after 10 -> ?assert(false)
+	end.
 
 -endif.
