@@ -49,7 +49,8 @@ past(History) ->
 %% Appends an event to the history's past, realizes it and notifies listeners
 
 append(History, EventType, EventData) ->
-	ok.
+	NewPast = [{EventType, EventData} | History#history.past],
+	History#history{past = NewPast}.
 
 %% ------------------------------------------------------------------------------------- %%
 %% Adds a new listener. The listener can be synchronized by replaying the whole past for
