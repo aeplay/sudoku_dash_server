@@ -18,7 +18,7 @@
 -record(history, {
 	past = [],
 	state = undefined,
-	realizer_function = undefined,
+	realizer_function = fun(State,_,_) -> State end,
 	listeners = []
 }).
 
@@ -50,7 +50,11 @@ past(History) ->
 
 append(History, EventType, EventData) ->
 	NewPast = [{EventType, EventData} | History#history.past],
-	History#history{past = NewPast}.
+
+	RealizerFunction = History#history.realizer_function,
+	NewState = RealizerFunction(History#history.state, EventType, EventData),
+	
+	History#history{past = NewPast, state = NewState}.
 
 %% ------------------------------------------------------------------------------------- %%
 %% Adds a new listener. The listener can be synchronized by replaying the whole past for
