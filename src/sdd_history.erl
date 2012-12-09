@@ -72,8 +72,8 @@ add_listener(History, ListenerFunction, SynchronizationType) ->
 			lists:foreach(fun(Event) ->
 				ListenerFunction(event, Event)
 			end, PastInOrder);
-	% 	tell_current_state ->
-	% 		ListenerFunction(state, History#history.state);
+		tell_state ->
+			ListenerFunction(state, History#history.state);
 		none ->
 			ok
 	end,
