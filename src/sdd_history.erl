@@ -99,4 +99,7 @@ remove_listener(History, ListenerName) ->
 new_assignsRealizerFunction_test() ->
 	?assertMatch(#history{realizer_function = dummy}, new(dummy)).
 
+state_returnsState_test() ->
+	?assertEqual(dummy, state(#history{state = dummy})).
+
 -endif.
