@@ -102,4 +102,7 @@ new_assignsRealizerFunction_test() ->
 state_returnsState_test() ->
 	?assertEqual(dummy, state(#history{state = dummy})).
 
+past_returnsPast_test() ->
+	?assertEqual(dummy, past(#history{past = dummy})).
+
 -endif.
