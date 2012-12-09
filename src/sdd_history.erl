@@ -105,4 +105,7 @@ state_returnsState_test() ->
 past_returnsPast_test() ->
 	?assertEqual(dummy, past(#history{past = dummy})).
 
+add_listener_addsListener_test() ->
+	?assertMatch(#history{listeners = [dummy]}, add_listener(#history{}, dummy)).
+
 -endif.
