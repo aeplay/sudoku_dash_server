@@ -141,4 +141,22 @@ append_changesStateWithRealizerFuntion_test() ->
 		append(#history{state = 1, realizer_function = RealizerFunction}, increase, 4)
 	).
 
+append_NotifiesListenersAndRemovesOnesThatAreUninterested_test() ->
+	InterestedListener = fun(event, EventType, EventData) ->
+		self() ! {EventType, EventData},
+		continue_listening
+	end,
+	UninterestedListener = fun(event, _, _) ->
+		whatever
+	end,
+	History = #history{listeners = [InterestedListener, UninterestedListener]},
+	?assertMatch(
+		#history{listeners = [InterestedListener]},
+		append(History, e_type, e_data)
+	),
+
+	receive {e_type, e_data} -> ?assert(true)
+	after 10 -> ?assert(false)
+	end.
+
 -endif.
