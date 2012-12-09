@@ -128,4 +128,13 @@ append_appendsEventToPast_test() ->
 		append(#history{past=[dummy]}, e_type, e_data)
 	).
 
+append_changesStateWithRealizerFuntion_test() ->
+	RealizerFunction = fun(Number, increase, Amount) ->
+		Number + Amount
+	end,
+	?assertMatch(
+		#history{state = 5},
+		append(#history{state = 1, realizer_function = RealizerFunction}, increase, 4)
+	).
+
 -endif.
