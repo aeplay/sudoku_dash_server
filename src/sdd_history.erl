@@ -53,8 +53,12 @@ append(History, EventType, EventData) ->
 
 	RealizerFunction = History#history.realizer_function,
 	NewState = RealizerFunction(History#history.state, EventType, EventData),
+
+	NewListeners = lists:filter(fun(ListenerFunction) ->
+		continue_listening =:= ListenerFunction(event, EventType, EventData)
+	end, History#history.listeners),
 	
-	History#history{past = NewPast, state = NewState}.
+	History#history{past = NewPast, state = NewState, listeners = NewListeners}.
 
 %% ------------------------------------------------------------------------------------- %%
 %% Adds a new listener. The listener can be synchronized by replaying the whole past for
