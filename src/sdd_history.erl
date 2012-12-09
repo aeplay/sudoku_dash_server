@@ -12,14 +12,14 @@
 -module(sdd_history).
 
 %% API
--export([new/1, state/1, past/1, append/3, add_listener/4, remove_listener/2]).
+-export([new/1, state/1, past/1, append/3, add_listener/2, remove_listener/2]).
 
 %% Types and Records
 -record(history, {
 	past = [],
 	state = undefined,
 	realizer_function = undefined,
-	listeners = dict:new()
+	listeners = []
 }).
 
 
@@ -65,20 +65,20 @@ append(History, EventType, EventData) ->
 %% Adds a new listener. The listener can be synchronized by replaying the whole past for
 %% the listener, or by giving the listener the current state
 
-add_listener(History, ListenerName, ListenerFunction, SynchronizationType) ->
-	case SynchronizationType of
-		%replay_past ->
-		%	PastInOrder = lists:reverse(History#history.past),
-		%	lists:foreach(fun(Event) ->
-		%		ListenerFunction(event, Event)
-		%	end, PastInOrder);
-		%tell_current_state ->
-		%	ListenerFunction(state, History#history.state);
-		none ->
-			ok
-	end,
+add_listener(History, ListenerFunction) ->
+	% case SynchronizationType of
+	% 	replay_past ->
+	% 		PastInOrder = lists:reverse(History#history.past),
+	% 		lists:foreach(fun(Event) ->
+	% 			ListenerFunction(event, Event)
+	% 		end, PastInOrder);
+	% 	tell_current_state ->
+	% 		ListenerFunction(state, History#history.state);
+	% 	none ->
+	% 		ok
+	% end,
 
-	NewListeners = dict:store(ListenerName, ListenerFunction, History#history.listeners),
+	NewListeners = [ListenerFunction|History#history.listeners],
 	History#history{listeners = NewListeners}.
 
 %% ------------------------------------------------------------------------------------- %%
