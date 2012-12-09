@@ -213,4 +213,7 @@ guess_ignoresGuessAfterComplete_test() ->
 	{noreply, HistoryAfterNewGuess} = handle_cast({guess, "Peter", {27, 1}}, HistoryAfterCompletingGuess),
 	?assertEqual(HistoryAfterCompletingGuess, HistoryAfterNewGuess).
 
+game_stopsWhenRecievingCompleteTimeout_test() ->
+	?assertEqual({stop, complete, dummy_history}, handle_info(exit_complete, dummy_history)).
+
 -endif.
