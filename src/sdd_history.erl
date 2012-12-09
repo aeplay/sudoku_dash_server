@@ -121,4 +121,10 @@ add_listener_canSyncByTellingState_test() ->
 	after 10 -> ?assert(false)
 	end.
 
+append_appendsEventToPast_test() ->
+	?assertMatch(
+		#history{past = [{e_type,e_data},dummy]},
+		append(#history{past=[dummy]}, e_type, e_data)
+	).
+
 -endif.
