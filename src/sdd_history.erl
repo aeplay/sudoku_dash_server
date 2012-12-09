@@ -12,14 +12,14 @@
 -module(sdd_history).
 
 %% API
--export([new/1, state/1, past/1, append/3, add_listener/4, remove_listener/2]).
+-export([new/1, state/1, past/1, append/3, add_listener/3]).
 
 %% Types and Records
 -record(history, {
 	past = [],
 	state = undefined,
-	realizer_function = undefined,
-	listeners = dict:new()
+	realizer_function = fun(State,_,_) -> State end,
+	listeners = []
 }).
 
 
@@ -49,43 +49,35 @@ past(History) ->
 %% Appends an event to the history's past, realizes it and notifies listeners
 
 append(History, EventType, EventData) ->
-	Event = {now(), EventType, EventData},
-	NewPast = [Event|History#history.past],
+	NewPast = [{EventType, EventData} | History#history.past],
+
 	RealizerFunction = History#history.realizer_function,
 	NewState = RealizerFunction(History#history.state, EventType, EventData),
 
-	lists:foreach(fun(ListenerName) ->
-		ListenerFunction = dict:fetch(ListenerName, History#history.listeners),
-		ListenerFunction(event, Event)
-	end, dict:fetch_keys(History#history.listeners)),
-
-	History#history{past = NewPast, state = NewState}.
+	NewListeners = lists:filter(fun(ListenerFunction) ->
+		continue_listening =:= ListenerFunction(event, EventType, EventData)
+	end, History#history.listeners),
+	
+	History#history{past = NewPast, state = NewState, listeners = NewListeners}.
 
 %% ------------------------------------------------------------------------------------- %%
 %% Adds a new listener. The listener can be synchronized by replaying the whole past for
 %% the listener, or by giving the listener the current state
 
-add_listener(History, ListenerName, ListenerFunction, SynchronizationType) ->
+add_listener(History, ListenerFunction, SynchronizationType) ->
 	case SynchronizationType of
-		%replay_past ->
-		%	PastInOrder = lists:reverse(History#history.past),
-		%	lists:foreach(fun(Event) ->
-		%		ListenerFunction(event, Event)
-		%	end, PastInOrder);
-		%tell_current_state ->
-		%	ListenerFunction(state, History#history.state);
+		replay_past ->
+			PastInOrder = lists:reverse(History#history.past),
+			lists:foreach(fun(Event) ->
+				ListenerFunction(event, Event)
+			end, PastInOrder);
+		tell_state ->
+			ListenerFunction(state, History#history.state);
 		none ->
 			ok
 	end,
 
-	NewListeners = dict:store(ListenerName, ListenerFunction, History#history.listeners),
-	History#history{listeners = NewListeners}.
-
-%% ------------------------------------------------------------------------------------- %%
-%% Removes an existing listener.
-
-remove_listener(History, ListenerName) ->
-	NewListeners = dict:erase(ListenerName, History#history.listeners),
+	NewListeners = [ListenerFunction|History#history.listeners],
 	History#history{listeners = NewListeners}.
 
 %%% =================================================================================== %%%
@@ -96,77 +88,79 @@ remove_listener(History, ListenerName) ->
 
 -include_lib("eunit/include/eunit.hrl").
 
-new_test() ->
-	InitialHistory = #history{realizer_function=dummy},
-	?assertEqual(
-		InitialHistory,
-		new(dummy)
-	).
+new_assignsRealizerFunction_test() ->
+	?assertMatch(#history{realizer_function = dummy}, new(dummy)).
 
-state_test() ->
-	History = #history{realizer_function=dummy, state=test_state},
-	?assertEqual(
-		test_state,
-		state(History)
-	).
+state_returnsState_test() ->
+	?assertEqual(dummy, state(#history{state = dummy})).
 
-append_and_listener_test() ->
-	% appending anything fails, if the realizer function is not a function
-	History0 = new(not_a_function),
-	?assertError(
-		{badfun, not_a_function},
-		append(History0, anything, anything)
-	),
+past_returnsPast_test() ->
+	?assertEqual(dummy, past(#history{past = dummy})).
 
-	% see if realizer function gets called
-	RealizerFunction = fun
-		(undefined, start, FirstNumber) -> FirstNumber;
-		(Number, increase_by, Increment) -> Number + Increment
-	end,
-	History1 = new(RealizerFunction),
-	History2 = append(History1, start, 5),
-	?assertEqual(
-		5,
-		History2#history.state
-	),
+add_listener_addsListener_test() ->
+	?assertMatch(#history{listeners = [dummy]}, add_listener(#history{}, dummy, none)).
 
-	% appending fails if a listener function is not a function
-	History3 = add_listener(History2, broken_listener, not_a_function, none),
-	?assertError(
-		{badfun, not_a_function},
-		append(History3, increase_by, 3)
-	),
-
-	% see if listener function gets called
-	put(times_listener_called, 0),
+add_listener_canSyncByReplayingPast_test() ->
+	History = #history{past = [c,b,a]},
 	ListenerFunction = fun(event, Event) ->
-		?assertMatch(
-			{_Time, increase_by, 7},
-			Event
-		),
-		put(times_listener_called, get(times_listener_called) + 1)
+		self() ! Event
 	end,
-	History4 = add_listener(History2, test_listener, ListenerFunction, none),
-	History5 = append(History4, increase_by, 7),
-	?assertEqual(
-		1,
-		get(times_listener_called)
-	),
+	add_listener(History, ListenerFunction, replay_past),
 
-	% see if listener function is not called after it has been removed
-	History6 = remove_listener(History5, test_listener),
-	History7 = append(History6, increase_by, 4),
-	?assertEqual(
-		1,
-		get(times_listener_called)
-	),
+	receive a -> ?assert(true)
+	after 10 -> ?assert(false)
+	end,
 
-	erase(times_listener_called),
+	receive b -> ?assert(true)
+	after 10 -> ?assert(false)
+	end,
 
-	% last sanity check
-	?assertEqual(
-		16,
-		History7#history.state
+	receive c -> ?assert(true)
+	after 10 -> ?assert(false)
+	end.
+
+add_listener_canSyncByTellingState_test() ->
+	ListenerFunction = fun(state, State) ->
+		self() ! State
+	end,
+
+	add_listener(#history{state = dummy}, ListenerFunction, tell_state),
+
+	receive dummy -> ?assert(true)
+	after 10 -> ?assert(false)
+	end.
+
+append_appendsEventToPast_test() ->
+	?assertMatch(
+		#history{past = [{e_type,e_data},dummy]},
+		append(#history{past=[dummy]}, e_type, e_data)
 	).
+
+append_changesStateWithRealizerFuntion_test() ->
+	RealizerFunction = fun(Number, increase, Amount) ->
+		Number + Amount
+	end,
+	?assertMatch(
+		#history{state = 5},
+		append(#history{state = 1, realizer_function = RealizerFunction}, increase, 4)
+	).
+
+append_NotifiesListenersAndRemovesOnesThatAreUninterested_test() ->
+	InterestedListener = fun(event, EventType, EventData) ->
+		self() ! {EventType, EventData},
+		continue_listening
+	end,
+	UninterestedListener = fun(event, _, _) ->
+		whatever
+	end,
+	History = #history{listeners = [InterestedListener, UninterestedListener]},
+	?assertMatch(
+		#history{listeners = [InterestedListener]},
+		append(History, e_type, e_data)
+	),
+
+	receive {e_type, e_data} -> ?assert(true)
+	after 10 -> ?assert(false)
+	end.
 
 -endif.
