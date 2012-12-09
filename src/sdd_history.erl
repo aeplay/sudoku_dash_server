@@ -106,6 +106,26 @@ past_returnsPast_test() ->
 	?assertEqual(dummy, past(#history{past = dummy})).
 
 add_listener_addsListener_test() ->
-	?assertMatch(#history{listeners = [dummy]}, add_listener(#history{}, dummy)).
+	?assertMatch(#history{listeners = [dummy]}, add_listener(#history{}, dummy, none)).
+
+add_listener_canSyncByReplayingPast_test() ->
+	History = #history{past = [c,b,a]},
+	ListenerFunction = fun(event, Event) ->
+		self() ! Event
+	end,
+	add_listener(History, ListenerFunction, replay_past),
+
+	receive a -> ?assert(true)
+	after 10 -> ?assert(false)
+	end,
+
+	receive b -> ?assert(true)
+	after 10 -> ?assert(false)
+	end,
+
+	receive c -> ?assert(true)
+	after 10 -> ?assert(false)
+	end.
+
 
 -endif.
