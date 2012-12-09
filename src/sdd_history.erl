@@ -96,6 +96,7 @@ remove_listener(History, ListenerName) ->
 
 -include_lib("eunit/include/eunit.hrl").
 
-
+new_assignsRealizerFunction_test() ->
+	?assertMatch(#history{realizer_function = dummy}, new(dummy)).
 
 -endif.
