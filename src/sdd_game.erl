@@ -126,6 +126,13 @@ chat_addsChatMessageToHistory_test() ->
 	Past = sdd_history:past(HistoryAfterChat),
 	?assertMatch([{_Time, chat, {"Peter", "Hello"}}], Past).
 
+join_createsJoinEventAndLeavesStateAlone_test() ->
+	DummyHistory = sdd_history:new(fun realize_event/3),
+	{noreply, HistoryAfterJoin} = handle_cast({join, "Peter", random}, DummyHistory),
+	Past = sdd_history:past(HistoryAfterJoin),
+	?assertMatch([{_Time, join, {"Peter", random}}], Past),
+	?assertEqual(sdd_history:state(DummyHistory), sdd_history:state(HistoryAfterJoin)).
+
 guess_updatesBoardOnCorrectGuess_test() ->
 	InitialBoard = array:from_list(
 		[4,1,6,5,2,0,8,9,3,
