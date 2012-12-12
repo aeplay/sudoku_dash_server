@@ -49,13 +49,14 @@ past(History) ->
 %% Appends an event to the history's past, realizes it and notifies listeners
 
 append(History, EventType, EventData) ->
-	NewPast = [{EventType, EventData} | History#history.past],
+	Event = {now(), EventType, EventData},
+	NewPast = [Event | History#history.past],
 
 	RealizerFunction = History#history.realizer_function,
 	NewState = RealizerFunction(History#history.state, EventType, EventData),
 
 	NewListeners = lists:filter(fun(ListenerFunction) ->
-		continue_listening =:= ListenerFunction(event, EventType, EventData)
+		continue_listening =:= ListenerFunction(event, Event)
 	end, History#history.listeners),
 	
 	History#history{past = NewPast, state = NewState, listeners = NewListeners}.
@@ -132,7 +133,7 @@ add_listener_canSyncByTellingState_test() ->
 
 append_appendsEventToPast_test() ->
 	?assertMatch(
-		#history{past = [{e_type,e_data},dummy]},
+		#history{past = [{_Time, e_type,e_data},dummy]},
 		append(#history{past=[dummy]}, e_type, e_data)
 	).
 
@@ -146,11 +147,11 @@ append_changesStateWithRealizerFuntion_test() ->
 	).
 
 append_NotifiesListenersAndRemovesOnesThatAreUninterested_test() ->
-	InterestedListener = fun(event, EventType, EventData) ->
-		self() ! {EventType, EventData},
+	InterestedListener = fun(event, {Time, EventType, EventData}) ->
+		self() ! {Time, EventType, EventData},
 		continue_listening
 	end,
-	UninterestedListener = fun(event, _, _) ->
+	UninterestedListener = fun(event, _) ->
 		whatever
 	end,
 	History = #history{listeners = [InterestedListener, UninterestedListener]},
@@ -159,7 +160,7 @@ append_NotifiesListenersAndRemovesOnesThatAreUninterested_test() ->
 		append(History, e_type, e_data)
 	),
 
-	receive {e_type, e_data} -> ?assert(true)
+	receive {_Time, e_type, e_data} -> ?assert(true)
 	after 10 -> ?assert(false)
 	end.
 
