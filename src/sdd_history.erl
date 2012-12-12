@@ -49,13 +49,14 @@ past(History) ->
 %% Appends an event to the history's past, realizes it and notifies listeners
 
 append(History, EventType, EventData) ->
-	NewPast = [{EventType, EventData} | History#history.past],
+	Event = {now(), EventType, EventData},
+	NewPast = [Event | History#history.past],
 
 	RealizerFunction = History#history.realizer_function,
 	NewState = RealizerFunction(History#history.state, EventType, EventData),
 
 	NewListeners = lists:filter(fun(ListenerFunction) ->
-		continue_listening =:= ListenerFunction(event, EventType, EventData)
+		continue_listening =:= ListenerFunction(event, Event)
 	end, History#history.listeners),
 	
 	History#history{past = NewPast, state = NewState, listeners = NewListeners}.
