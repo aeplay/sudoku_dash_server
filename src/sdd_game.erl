@@ -48,6 +48,12 @@ handle_cast({chat, PlayerId, Message}, History) ->
 	NewHistory = sdd_history:append(History, chat, {PlayerId, Message}),
 	{noreply, NewHistory};
 
+%% Adds a player to the game
+
+handle_cast({join, PlayerId, Source}, History) ->
+	NewHistory = sdd_history:append(History, join, {PlayerId, Source}),
+	{noreply, NewHistory};
+
 %% Handles a guess, looks if it was right and creates an according event
 %% If the game is now complete, starts timeout after which it is stopped
 
@@ -99,7 +105,8 @@ realize_event(State, guess, {_, _, _, _}) -> State;
 
 %% Does not change state for all other used events
 
-realize_event(State, chat, _) -> State.
+realize_event(State, chat, _) -> State;
+realize_event(State, join, _) -> State.
 
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
