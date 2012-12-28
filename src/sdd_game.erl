@@ -50,8 +50,9 @@ handle_cast({chat, PlayerId, Message}, History) ->
 
 %% Adds a player to the game
 
-handle_cast({join, PlayerId, Source}, History) ->
-	NewHistory = sdd_history:append(History, join, {PlayerId, Source}),
+handle_cast({join, PlayerId, ListenerFunction, Source}, History) ->
+	HistoryWithNewListener = sdd_history:add_listener(History, ListenerFunction, replay_past),
+	NewHistory = sdd_history:append(HistoryWithNewListener, join, {PlayerId, Source}),
 	{noreply, NewHistory};
 
 %% Handles a guess, looks if it was right and creates an according event
@@ -135,7 +136,9 @@ chat_addsChatMessageToHistory_test() ->
 
 join_createsJoinEventAndLeavesStateAlone_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
-	{noreply, HistoryAfterJoin} = handle_cast({join, "Peter", fun(event, _) -> whatever end, random}, DummyHistory),
+	ListenerFunction = fun(event, _) -> whatever end,
+
+	{noreply, HistoryAfterJoin} = handle_cast({join, "Peter", ListenerFunction, random}, DummyHistory),
 	Past = sdd_history:past(HistoryAfterJoin),
 	?assertMatch([{_Time, join, {"Peter", random}}], Past),
 	?assertEqual(sdd_history:state(DummyHistory), sdd_history:state(HistoryAfterJoin)).
