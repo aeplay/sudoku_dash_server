@@ -135,10 +135,22 @@ chat_addsChatMessageToHistory_test() ->
 
 join_createsJoinEventAndLeavesStateAlone_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
-	{noreply, HistoryAfterJoin} = handle_cast({join, "Peter", random}, DummyHistory),
+	{noreply, HistoryAfterJoin} = handle_cast({join, "Peter", fun(event, _) -> whatever end, random}, DummyHistory),
 	Past = sdd_history:past(HistoryAfterJoin),
 	?assertMatch([{_Time, join, {"Peter", random}}], Past),
 	?assertEqual(sdd_history:state(DummyHistory), sdd_history:state(HistoryAfterJoin)).
+
+join_addsPlayerListenerFunctionToHistory_test() ->
+	DummyHistory = sdd_history:new(fun realize_event/3),
+	ListenerFunction = fun(event, Event) ->
+		self() ! Event,
+		continue_listening
+	end,
+	{noreply, _HistoryAfterJoin} = handle_cast({join, "Peter", ListenerFunction, random}, DummyHistory),
+
+	receive {_Time, join, {"Peter", random}} -> ?assert(true)
+	after 10 -> ?assert(false)
+	end.
 
 guess_updatesBoardOnCorrectGuess_test() ->
 	InitialBoard = array:from_list(
