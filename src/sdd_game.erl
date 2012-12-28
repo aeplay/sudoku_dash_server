@@ -155,6 +155,13 @@ join_addsPlayerListenerFunctionToHistory_test() ->
 	after 10 -> ?assert(false)
 	end.
 
+leave_createsLeaveEventAndLeavesStateAlone_test() ->
+	DummyHistory = sdd_history:new(fun realize_event/3),
+	{noreply, HistoryAfterLeave} = handle_cast({leave, "Peter", fell_asleep}, DummyHistory),
+	Past = sdd_history:past(HistoryAfterLeave),
+	?assertMatch([{_Time, leave, {"Peter", fell_asleep}}], Past),
+	?assertEqual(sdd_history:state(DummyHistory), sdd_history:state(HistoryAfterLeave)).
+
 guess_updatesBoardOnCorrectGuess_test() ->
 	InitialBoard = array:from_list(
 		[4,1,6,5,2,0,8,9,3,
