@@ -71,4 +71,21 @@ init_createsNewPlayerWithNameAndSecret_test() ->
 	Past = sdd_history:past(InitialHistory),
 	?assertMatch([{_Time, register, {"Peter", "secret"}}], Past).
 
+handle_game_event_guess_SavesOwnPositiveGuessResultAndIncreasesPoints_test() ->
+	{ok, InitialHistory} = init({"Peter", "secret"}),
+
+	{noreply, HistoryAfterSomeonesGuess} = handle_call({game_event, guess, {"SomeoneElse", 34, 3, {good}}}, InitialHistory),
+	?assertEqual(HistoryAfterSomeonesGuess, InitialHistory),
+
+	{noreply, HistoryAfterOwnNegativeGuess} = handle_call({game_event, guess, {"Peter", 34, 4, {not_good}}}, InitialHistory),
+	?assertEqual(HistoryAfterOwnNegativeGuess, InitialHistory),	
+
+	{noreply, HistoryAfterOwnPositiveGuess} = handle_call({game_event, guess, {"Peter", 34, 3, {good}}}, InitialHistory),
+	
+	State = sdd_history:state(HistoryAfterOwnPositiveGuess),
+	?assertEqual(State#state.points, 1),
+	
+	Past = sdd_history:past(HistoryAfterOwnPositiveGuess),
+	?assertMatch([{_Time, get_guess_reward, {good}} | _ ], Past).
+
 -endif.
