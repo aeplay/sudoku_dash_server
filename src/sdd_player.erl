@@ -95,6 +95,20 @@ init_createsNewPlayerWithNameAndSecret_test() ->
 	Past = sdd_history:past(InitialHistory),
 	?assertMatch([{_Time, register, {"Peter", "secret"}}], Past).
 
+join_notifiesGameWeWantToJoinAndSavesGameAsCurrentGameIfSuccessful_test() ->
+	{ok, InitialHistory} = init({"Peter", "secret"}),
+
+	{noreply, HistoryAfterBadJoin} = handle_cast({join, {"BadGame", random}}, InitialHistory),
+	?assertEqual(HistoryAfterBadJoin, InitialHistory),
+
+	{noreply, HistoryAfterGoodJoin} = handle_cast({join, {"GoodGame", invite}}, InitialHistory),
+
+	State = sdd_history:state(HistoryAfterGoodJoin),
+	?assertEqual(State#state.current_game, "GoodGame"),
+
+	Past = sdd_history:past(HistoryAfterGoodJoin),
+	?assertMatch([{_Time, join, {"GoodGame", invite}} | _], Past).
+
 handle_game_event_guess_SavesOwnPositiveGuessResultAndIncreasesPoints_test() ->
 	{ok, InitialHistory} = init({"Peter", "secret"}),
 
