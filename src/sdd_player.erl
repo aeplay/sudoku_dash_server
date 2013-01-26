@@ -19,7 +19,8 @@
 -record(state, {
 	name,
 	secret,
-	points
+	points,
+	current_game
 }).
 
 %%% =================================================================================== %%%
@@ -45,6 +46,19 @@ init(PlayerInfo) ->
 	EmptyHistory = sdd_history:new(fun realize_event/3),
 	InitialHistory = sdd_history:append(EmptyHistory, register, PlayerInfo),
 	{ok, InitialHistory}.
+
+%% ------------------------------------------------------------------------------------- %%
+%% Tries to join a game, coming from a source
+
+handle_cast({join, {GameId, Source}}, History) ->
+	State = sdd_history:state(History),
+	case sdd_game:join(State#state.name, GameId, Source) of
+		ok ->
+			NewHistory = sdd_history:append(History, join, {GameId, Source}),
+			{noreply, NewHistory};
+		_Error ->
+			{noreply, History}
+	end.
 
 %% ------------------------------------------------------------------------------------- %%
 %% Saves own positive guess results
@@ -74,7 +88,12 @@ realize_event(_EmptyState, register, {Name, Secret}) ->
 %% Increase points on good guess result
 
 realize_event(State, get_guess_reward, _Result) ->
-	State#state{points = State#state.points + 1}.
+	State#state{points = State#state.points + 1};
+
+%% Change current game
+
+realize_event(State, join, {GameId, _Source}) ->
+	State#state{current_game = GameId}.
 
 
 %%% =================================================================================== %%%
