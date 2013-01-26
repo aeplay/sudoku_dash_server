@@ -65,6 +65,7 @@ init_createsNewPlayerWithNameAndSecret_test() ->
 	State = sdd_history:state(InitialHistory),
 	?assertEqual(State#state.name, "Peter"),
 	?assertEqual(State#state.secret, "secret"),
+	?assertEqual(State#state.points, 0),
 
 	Past = sdd_history:past(InitialHistory),
 	?assertMatch([{_Time, register, {"Peter", "secret"}}], Past).
