@@ -46,12 +46,36 @@ init(PlayerInfo) ->
 	InitialHistory = sdd_history:append(EmptyHistory, register, PlayerInfo),
 	{ok, InitialHistory}.
 
+%% ------------------------------------------------------------------------------------- %%
+%% Saves own positive guess results
+
+handle_call({game_event, guess, {Name, _Position, _Number, Result}}, History) ->
+	State = sdd_history:state(History),
+	case State#state.name of
+		Name ->
+			case Result of
+				{good} ->
+					NewHistory = sdd_history:append(History, get_guess_reward, Result),
+					{noreply, NewHistory};
+				_NotGood ->	
+					{noreply, History}
+			end;
+		_SomeoneElse ->
+			{noreply, History}
+	end.
+
 %%% =================================================================================== %%%
 %%% HISTORY CALLBACKS                                                                   %%%
 %%% =================================================================================== %%%
 
 realize_event(_EmptyState, register, {Name, Secret}) ->
-	#state{name = Name, secret = Secret, points = 0}.
+	#state{name = Name, secret = Secret, points = 0};
+
+%% Increase points on good guess result
+
+realize_event(State, get_guess_reward, _Result) ->
+	State#state{points = State#state.points + 1}.
+
 
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
