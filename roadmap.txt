@@ -1,0 +1,6 @@
+- implement basic game functionality
+- implement basic player functionality
+- connect player and game
+- connect websocket client and player
+- manage multiple games
+- manage a dash
