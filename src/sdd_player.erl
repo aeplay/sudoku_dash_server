@@ -82,6 +82,9 @@ handle_call({game_event, guess, {Name, _Position, _Number, Result}}, History) ->
 %%% HISTORY CALLBACKS                                                                   %%%
 %%% =================================================================================== %%%
 
+%% ------------------------------------------------------------------------------------- %%
+%% Create initial state
+
 realize_event(_EmptyState, register, {Name, Secret}) ->
 	#state{name = Name, secret = Secret, points = 0};
 
