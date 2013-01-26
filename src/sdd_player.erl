@@ -18,7 +18,8 @@
 %% Records
 -record(state, {
 	name,
-	secret
+	secret,
+	points
 }).
 
 %%% =================================================================================== %%%
@@ -50,7 +51,7 @@ init(PlayerInfo) ->
 %%% =================================================================================== %%%
 
 realize_event(_EmptyState, register, {Name, Secret}) ->
-	#state{name = Name, secret = Secret}.
+	#state{name = Name, secret = Secret, points = 0}.
 
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
