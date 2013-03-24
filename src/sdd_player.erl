@@ -19,8 +19,9 @@
 -record(state, {
 	name,
 	secret,
+	current_game,
 	points,
-	current_game
+	badges = []
 }).
 
 %%% =================================================================================== %%%
@@ -76,7 +77,14 @@ handle_call({game_event, guess, {Name, _Position, _Number, Result}}, History) ->
 			end;
 		_SomeoneElse ->
 			{noreply, History}
-	end.
+	end;
+
+%% ------------------------------------------------------------------------------------- %%
+%% Adds a badge
+
+handle_call({get_badge, Badge}, History) ->
+	NewHistory = sdd_history:append(History, get_badge, Badge),
+	{noreply, NewHistory}.
 
 %%% =================================================================================== %%%
 %%% HISTORY CALLBACKS                                                                   %%%
@@ -96,7 +104,12 @@ realize_event(State, get_guess_reward, _Result) ->
 %% Change current game
 
 realize_event(State, join, {GameId, _Source}) ->
-	State#state{current_game = GameId}.
+	State#state{current_game = GameId};
+
+%% Add a badge
+
+realize_event(State, get_badge, Badge) ->
+	State#state{badges = [Badge | State#state.badges]}.
 
 
 %%% =================================================================================== %%%
