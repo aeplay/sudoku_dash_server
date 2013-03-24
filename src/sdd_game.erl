@@ -42,17 +42,18 @@ init(_Opts) ->
 	{ok, InitialHistory}.
 
 %% ------------------------------------------------------------------------------------- %%
+%% Adds a player to the game
+
+handle_call({join, PlayerId, ListenerFunction, Source}, History) ->
+	HistoryWithNewListener = sdd_history:add_listener(History, ListenerFunction, replay_past),
+	NewHistory = sdd_history:append(HistoryWithNewListener, join, {PlayerId, Source}),
+	{ok, NewHistory}.
+
+%% ------------------------------------------------------------------------------------- %%
 %% Adds a chat message to the history
 
 handle_cast({chat, PlayerId, Message}, History) ->
 	NewHistory = sdd_history:append(History, chat, {PlayerId, Message}),
-	{noreply, NewHistory};
-
-%% Adds a player to the game
-
-handle_cast({join, PlayerId, ListenerFunction, Source}, History) ->
-	HistoryWithNewListener = sdd_history:add_listener(History, ListenerFunction, replay_past),
-	NewHistory = sdd_history:append(HistoryWithNewListener, join, {PlayerId, Source}),
 	{noreply, NewHistory};
 
 %% Notifies other players that a player left
@@ -145,7 +146,7 @@ join_createsJoinEventAndLeavesStateAlone_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
 	ListenerFunction = fun(event, _) -> whatever end,
 
-	{noreply, HistoryAfterJoin} = handle_cast({join, "Peter", ListenerFunction, random}, DummyHistory),
+	{ok, HistoryAfterJoin} = handle_call({join, "Peter", ListenerFunction, random}, DummyHistory),
 	Past = sdd_history:past(HistoryAfterJoin),
 	?assertMatch([{_Time, join, {"Peter", random}}], Past),
 	?assertEqual(sdd_history:state(DummyHistory), sdd_history:state(HistoryAfterJoin)).
@@ -156,7 +157,7 @@ join_addsPlayerListenerFunctionToHistory_test() ->
 		self() ! Event,
 		continue_listening
 	end,
-	{noreply, _HistoryAfterJoin} = handle_cast({join, "Peter", ListenerFunction, random}, DummyHistory),
+	{ok, _HistoryAfterJoin} = handle_call({join, "Peter", ListenerFunction, random}, DummyHistory),
 
 	receive {_Time, join, {"Peter", random}} -> ?assert(true)
 	after 10 -> ?assert(false)
