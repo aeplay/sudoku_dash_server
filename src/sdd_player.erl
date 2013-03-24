@@ -161,6 +161,6 @@ get_badge_addsABadge_test() ->
 	?assertEqual(State#state.badges, [Badge2, Badge1]),
 
 	Past = sdd_history:past(HistoryAfterGettingSecondBadge),
-	?assertMatch([{_Time1, get_badge, Badge1}, {_Time2, get_badge, Badge2} | _ ], Past).
+	?assertMatch([{_Time2, get_badge, Badge2}, {_Time1, get_badge, Badge1} | _ ], Past).
 
 -endif.
