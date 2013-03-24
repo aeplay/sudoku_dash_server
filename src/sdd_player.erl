@@ -148,4 +148,19 @@ handle_game_event_guess_SavesOwnPositiveGuessResultAndIncreasesPoints_test() ->
 	Past = sdd_history:past(HistoryAfterOwnPositiveGuess),
 	?assertMatch([{_Time, get_guess_reward, {good}} | _ ], Past).
 
+get_badge_addsABadge_test() ->
+	{ok, InitialHistory} = init({"Peter", "secret"}),
+
+	Badge1 = {"Good Test Subject", "For being an important part of these unit tests"},
+	Badge2 = {"Good Person", "For having a beautiful personality"},
+
+	{noreply, HistoryAfterGettingFirstBadge} = handle_call({get_badge, Badge1}, InitialHistory),
+	{noreply, HistoryAfterGettingSecondBadge} = handle_call({get_badge, Badge2}, HistoryAfterGettingFirstBadge),
+	
+	State = sdd_history:state(HistoryAfterGettingSecondBadge),
+	?assertEqual(State#state.badges, [Badge2, Badge1]),
+
+	Past = sdd_history:past(HistoryAfterGettingSecondBadge),
+	?assertMatch([{_Time1, get_badge, Badge1}, {_Time2, get_badge, Badge2} | _ ], Past).
+
 -endif.
