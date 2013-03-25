@@ -61,9 +61,11 @@ handle_cast({join, {GameId, Source}}, History) ->
 			{noreply, History}
 	end;
 
-%% Leaves the current game, for a reason
+%% Leaves the current game, for a reason, and notifies the game
 
 handle_cast({leave, Reason}, History) ->
+	State = sdd_history:state(History),
+	sdd_game:leave(State#state.name, State#state.current_game, Reason),
 	NewHistory = sdd_history:append(History, leave, Reason),
 	{noreply, NewHistory}.
 
