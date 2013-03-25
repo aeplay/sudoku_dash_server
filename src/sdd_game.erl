@@ -52,9 +52,12 @@ init(_Opts) ->
 	{ok, InitialHistory}.
 
 %% ------------------------------------------------------------------------------------- %%
-%% Adds a player to the game
+%% Adds a player to the game, by creating an appropriate listener function
 
-handle_call({join, PlayerId, ListenerFunction, Source}, History) ->
+handle_call({join, PlayerId, Source}, History) ->
+	ListenerFunction = fun(event, {_Time, EventType, EventData}) ->
+		sdd_player:handle_game_event(PlayerId, EventType, EventData)
+	end,
 	HistoryWithNewListener = sdd_history:add_listener(History, ListenerFunction, replay_past),
 	NewHistory = sdd_history:append(HistoryWithNewListener, join, {PlayerId, Source}),
 	{ok, NewHistory}.
