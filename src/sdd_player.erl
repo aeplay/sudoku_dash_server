@@ -145,12 +145,21 @@ init_createsNewPlayerWithNameAndSecret_test() ->
 	?assertMatch([{_Time, register, {"Peter", "secret"}}], Past).
 
 join_notifiesGameWeWantToJoinAndSavesGameAsCurrentGameIfSuccessful_test() ->
+	meck:new(sdd_game),
+	meck:expect(sdd_game, join, fun
+		(_PlayerId, "GoodGame", _Source) -> ok;
+		(_PlayerId, "BadGame", _Source) -> nope
+	end),
+
 	{ok, InitialHistory} = init({"Peter", "secret"}),
 
 	{noreply, HistoryAfterBadJoin} = handle_cast({join, {"BadGame", random}}, InitialHistory),
 	?assertEqual(HistoryAfterBadJoin, InitialHistory),
 
 	{noreply, HistoryAfterGoodJoin} = handle_cast({join, {"GoodGame", invite}}, InitialHistory),
+
+	?assert(meck:validate(sdd_game)),
+	meck:unload(sdd_game),
 
 	State = sdd_history:state(HistoryAfterGoodJoin),
 	?assertEqual(State#state.current_game, "GoodGame"),
@@ -159,8 +168,15 @@ join_notifiesGameWeWantToJoinAndSavesGameAsCurrentGameIfSuccessful_test() ->
 	?assertMatch([{_Time, join, {"GoodGame", invite}} | _], Past).
 
 handle_game_event_continuesListeningOnlyIfEventWasFromCurrentGame_test() ->
+	meck:new(sdd_game),
+	meck:expect(sdd_game, join, fun
+		(_PlayerId, "GoodGame", _Source) -> ok
+	end),
+
 	{ok, InitialHistory} = init({"Peter", "secret"}),
 	{noreply, HistoryAfterGoodJoin} = handle_cast({join, {"GoodGame", invite}}, InitialHistory),
+
+	meck:unload(sdd_game),
 
 	?assertMatch(
 		{continue_listening, _NewHistory},
@@ -171,10 +187,16 @@ handle_game_event_continuesListeningOnlyIfEventWasFromCurrentGame_test() ->
 		handle_call({game_event, "OtherGame", some_event, some_data}, HistoryAfterGoodJoin)
 	).
 
-
 handle_game_event_guess_SavesOwnPositiveGuessResultAndIncreasesPoints_test() ->
+	meck:new(sdd_game),
+	meck:expect(sdd_game, join, fun
+		(_PlayerId, "GoodGame", _Source) -> ok
+	end),
+
 	{ok, InitialHistory} = init({"Peter", "secret"}),
 	{noreply, HistoryAfterGoodJoin} = handle_cast({join, {"GoodGame", invite}}, InitialHistory),
+
+	meck:unload(sdd_game),
 
 	{continue_listening, HistoryAfterSomeonesGuess} = handle_call({game_event, "GoodGame", guess, {"SomeoneElse", 34, 3, {good}}}, HistoryAfterGoodJoin),
 	?assertEqual(HistoryAfterSomeonesGuess, HistoryAfterGoodJoin),
