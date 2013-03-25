@@ -162,13 +162,13 @@ handle_game_event_guess_SavesOwnPositiveGuessResultAndIncreasesPoints_test() ->
 	{ok, InitialHistory} = init({"Peter", "secret"}),
 	{noreply, HistoryAfterGoodJoin} = handle_cast({join, {"GoodGame", invite}}, InitialHistory),
 
-	{noreply, HistoryAfterSomeonesGuess} = handle_call({game_event, "GoodGame", guess, {"SomeoneElse", 34, 3, {good}}}, InitialHistory),
-	?assertEqual(HistoryAfterSomeonesGuess, InitialHistory),
+	{continue_listening, HistoryAfterSomeonesGuess} = handle_call({game_event, "GoodGame", guess, {"SomeoneElse", 34, 3, {good}}}, HistoryAfterGoodJoin),
+	?assertEqual(HistoryAfterSomeonesGuess, HistoryAfterGoodJoin),
 
-	{noreply, HistoryAfterOwnNegativeGuess} = handle_call({game_event, "GoodGame", guess, {"Peter", 34, 4, {not_good}}}, InitialHistory),
-	?assertEqual(HistoryAfterOwnNegativeGuess, InitialHistory),	
+	{continue_listening, HistoryAfterOwnNegativeGuess} = handle_call({game_event, "GoodGame", guess, {"Peter", 34, 4, {not_good}}}, HistoryAfterGoodJoin),
+	?assertEqual(HistoryAfterOwnNegativeGuess, HistoryAfterGoodJoin),	
 
-	{noreply, HistoryAfterOwnPositiveGuess} = handle_call({game_event, "GoodGame", guess, {"Peter", 34, 3, {good}}}, InitialHistory),
+	{continue_listening, HistoryAfterOwnPositiveGuess} = handle_call({game_event, "GoodGame", guess, {"Peter", 34, 3, {good}}}, HistoryAfterGoodJoin),
 	
 	State = sdd_history:state(HistoryAfterOwnPositiveGuess),
 	?assertEqual(State#state.points, 1),
