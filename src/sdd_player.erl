@@ -64,19 +64,32 @@ handle_cast({join, {GameId, Source}}, History) ->
 %% ------------------------------------------------------------------------------------- %%
 %% Saves own positive guess results
 
-handle_call({game_event, guess, {Name, _Position, _Number, Result}}, History) ->
+handle_call({game_event, GameId, EventType, EventData}, History) ->
 	State = sdd_history:state(History),
-	case State#state.name of
-		Name ->
-			case Result of
-				{good} ->
-					NewHistory = sdd_history:append(History, get_guess_reward, Result),
-					{noreply, NewHistory};
-				_NotGood ->	
-					{noreply, History}
-			end;
-		_SomeoneElse ->
-			{noreply, History}
+	CurrentGame = State#state.current_game,
+	MyName = State#state.name ,
+	case GameId of
+		CurrentGame ->
+			case EventType of
+				guess ->
+					{Name, _Position, _Number, Result} = EventData,
+					case Name of
+						MyName ->
+							case Result of
+								{good} ->
+									NewHistory = sdd_history:append(History, get_guess_reward, Result),
+									{continue_listening, NewHistory};
+								_NotGood ->	
+									{continue_listening, History}
+							end;
+						_SomeoneElse ->
+							{continue_listening, History}
+					end;
+				_OtherEvent ->
+					{continue_listening, History}
+				end;
+		_WrongGame ->
+			{wrong_game, History}
 	end;
 
 %% ------------------------------------------------------------------------------------- %%
