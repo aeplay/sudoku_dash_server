@@ -191,9 +191,13 @@ leave_resetsCurrentGame_test() ->
 	{ok, InitialHistory} = init({"Peter", "secret"}),
 	{noreply, HistoryAfterGoodJoin} = handle_cast({join, {"GoodGame", invite}}, InitialHistory),
 
-	meck:unload(sdd_game),
+	meck:expect(sdd_game, leave, fun
+		("Peter", "GoodGame", timeout) -> ok
+	end),
 
 	{noreply, HistoryAfterLeaving} = handle_cast({leave, timeout}, HistoryAfterGoodJoin),
+
+	meck:unload(sdd_game),
 	
 	State = sdd_history:state(HistoryAfterLeaving),
 	?assertEqual(State#state.current_game, undefined),
