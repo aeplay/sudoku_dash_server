@@ -299,7 +299,7 @@ get_badge_addsABadge_test() ->
 	Past = sdd_history:past(HistoryAfterGettingSecondBadge),
 	?assertMatch([{_Time2, get_badge, Badge2}, {_Time1, get_badge, Badge1} | _ ], Past).
 
-connects_setsNewClient_test() ->
+connect_setsNewClient_test() ->
 	{ok, InitialHistory} = init({"Peter", "secret"}),
 	{ok, HistoryAfterConnect} = handle_call({connect, "ClientA", "ClientAInfo"}, InitialHistory),
 
