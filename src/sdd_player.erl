@@ -77,9 +77,13 @@ handle_cast({leave, Reason}, History) ->
 handle_call({game_event, GameId, EventType, EventData}, History) ->
 	State = sdd_history:state(History),
 	CurrentGame = State#state.current_game,
-	MyName = State#state.name ,
+	MyName = State#state.name,
 	case GameId of
 		CurrentGame ->
+			case State#state.current_client of
+				undefined -> do_nothing;
+				ClientId -> sdd_client:handle_event(ClientId, game_event, GameId, EventType, EventData)
+			end,
 			case EventType of
 				guess ->
 					{Name, _Position, _Number, Result} = EventData,
