@@ -154,24 +154,25 @@ chat_addsChatMessageToHistory_test() ->
 
 join_createsJoinEventAndLeavesStateAlone_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
-	ListenerFunction = fun(event, _) -> whatever end,
+	meck:new(sdd_player),
+	meck:expect(sdd_player, handle_game_event, fun(_, _, _) -> continue_listening end),
 
-	{ok, HistoryAfterJoin} = handle_call({join, "Peter", ListenerFunction, random}, DummyHistory),
+	{ok, HistoryAfterJoin} = handle_call({join, "Peter", random}, DummyHistory),
 	Past = sdd_history:past(HistoryAfterJoin),
 	?assertMatch([{_Time, join, {"Peter", random}}], Past),
-	?assertEqual(sdd_history:state(DummyHistory), sdd_history:state(HistoryAfterJoin)).
+	?assertEqual(sdd_history:state(DummyHistory), sdd_history:state(HistoryAfterJoin)),
+
+	meck:unload(sdd_player).
 
 join_addsPlayerListenerFunctionToHistory_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
-	ListenerFunction = fun(event, Event) ->
-		self() ! Event,
-		continue_listening
-	end,
-	{ok, _HistoryAfterJoin} = handle_call({join, "Peter", ListenerFunction, random}, DummyHistory),
+	meck:new(sdd_player),
+	meck:expect(sdd_player, handle_game_event, fun("Peter", join, {"Peter", random}) -> continue_listening end),
 
-	receive {_Time, join, {"Peter", random}} -> ?assert(true)
-	after 10 -> ?assert(false)
-	end.
+	{ok, _HistoryAfterJoin} = handle_call({join, "Peter", random}, DummyHistory),
+
+	?assert(meck:validate(sdd_player)),
+	meck:unload(sdd_player).
 
 leave_createsLeaveEventAndLeavesStateAlone_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
