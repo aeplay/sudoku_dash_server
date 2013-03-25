@@ -20,6 +20,7 @@
 	name,
 	secret,
 	current_game,
+	current_client,
 	points,
 	badges = []
 }).
@@ -106,7 +107,14 @@ handle_call({game_event, GameId, EventType, EventData}, History) ->
 
 handle_call({get_badge, Badge}, History) ->
 	NewHistory = sdd_history:append(History, get_badge, Badge),
-	{noreply, NewHistory}.
+	{noreply, NewHistory};
+
+%% ------------------------------------------------------------------------------------- %%
+%% Connects a new client
+
+handle_call({connect, ClientId, ClientInfo}, History) ->
+	NewHistory = sdd_history:append(History, connect, {ClientId, ClientInfo}),
+	{ok, NewHistory}.
 
 %%% =================================================================================== %%%
 %%% HISTORY CALLBACKS                                                                   %%%
@@ -136,8 +144,12 @@ realize_event(State, leave, _Reason) ->
 %% Add a badge
 
 realize_event(State, get_badge, Badge) ->
-	State#state{badges = [Badge | State#state.badges]}.
+	State#state{badges = [Badge | State#state.badges]};
 
+%% Set new client
+
+realize_event(State, connect, {ClientId, _ClientInfo}) ->
+	State#state{current_client = ClientId}.
 
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
