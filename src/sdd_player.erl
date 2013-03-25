@@ -167,6 +167,25 @@ join_notifiesGameWeWantToJoinAndSavesGameAsCurrentGameIfSuccessful_test() ->
 	Past = sdd_history:past(HistoryAfterGoodJoin),
 	?assertMatch([{_Time, join, {"GoodGame", invite}} | _], Past).
 
+leave_resetsCurrentGame_test() ->
+	meck:new(sdd_game),
+	meck:expect(sdd_game, join, fun
+		(_PlayerId, "GoodGame", _Source) -> ok
+	end),
+
+	{ok, InitialHistory} = init({"Peter", "secret"}),
+	{noreply, HistoryAfterGoodJoin} = handle_cast({join, {"GoodGame", invite}}, InitialHistory),
+
+	meck:unload(sdd_game),
+
+	{noreply, HistoryAfterLeaving} = handle_cast({leave, timeout}, HistoryAfterGoodJoin),
+	
+	State = sdd_history:state(HistoryAfterLeaving),
+	?assertEqual(State#state.current_game, undefined),
+
+	Past = sdd_history:past(HistoryAfterLeaving),
+	?assertMatch([{_Time, leave, timeout} | _ ], Past).
+
 handle_game_event_continuesListeningOnlyIfEventWasFromCurrentGame_test() ->
 	meck:new(sdd_game),
 	meck:expect(sdd_game, join, fun
