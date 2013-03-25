@@ -158,8 +158,8 @@ init_createsNewPlayerWithNameAndSecret_test() ->
 join_notifiesGameWeWantToJoinAndSavesGameAsCurrentGameIfSuccessful_test() ->
 	meck:new(sdd_game),
 	meck:expect(sdd_game, join, fun
-		(_PlayerId, "GoodGame", _Source) -> ok;
-		(_PlayerId, "BadGame", _Source) -> nope
+		("Peter", "GoodGame", invite) -> ok;
+		("Peter", "BadGame", random) -> nope
 	end),
 
 	{ok, InitialHistory} = init({"Peter", "secret"}),
@@ -167,7 +167,11 @@ join_notifiesGameWeWantToJoinAndSavesGameAsCurrentGameIfSuccessful_test() ->
 	{noreply, HistoryAfterBadJoin} = handle_cast({join, {"BadGame", random}}, InitialHistory),
 	?assertEqual(HistoryAfterBadJoin, InitialHistory),
 
+	?assert(meck:called(sdd_game, join, ["Peter", "BadGame", random])),
+
 	{noreply, HistoryAfterGoodJoin} = handle_cast({join, {"GoodGame", invite}}, InitialHistory),
+
+	?assert(meck:called(sdd_game, join, ["Peter", "GoodGame", invite])),
 
 	?assert(meck:validate(sdd_game)),
 	meck:unload(sdd_game),
@@ -181,7 +185,7 @@ join_notifiesGameWeWantToJoinAndSavesGameAsCurrentGameIfSuccessful_test() ->
 leave_resetsCurrentGame_test() ->
 	meck:new(sdd_game),
 	meck:expect(sdd_game, join, fun
-		(_PlayerId, "GoodGame", _Source) -> ok
+		("Peter", "GoodGame", invite) -> ok
 	end),
 
 	{ok, InitialHistory} = init({"Peter", "secret"}),
@@ -196,6 +200,26 @@ leave_resetsCurrentGame_test() ->
 
 	Past = sdd_history:past(HistoryAfterLeaving),
 	?assertMatch([{_Time, leave, timeout} | _ ], Past).
+
+leave_notifiesGameThatWeLeft_test() ->	
+	meck:new(sdd_game),
+	meck:expect(sdd_game, join, fun
+		("Peter", "GoodGame", invite) -> ok
+	end),
+
+	{ok, InitialHistory} = init({"Peter", "secret"}),
+	{noreply, HistoryAfterGoodJoin} = handle_cast({join, {"GoodGame", invite}}, InitialHistory),
+	?assert(meck:validate(sdd_game)),
+
+	meck:expect(sdd_game, leave, fun
+		("Peter", "GoodGame", timeout) -> ok
+	end),
+
+	{noreply, _} = handle_cast({leave, timeout}, HistoryAfterGoodJoin),
+
+	?assert(meck:called(sdd_game, leave, '_')),
+	?assert(meck:validate(sdd_game)),
+	meck:unload(sdd_game).
 
 handle_game_event_continuesListeningOnlyIfEventWasFromCurrentGame_test() ->
 	meck:new(sdd_game),
