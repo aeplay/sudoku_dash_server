@@ -59,7 +59,13 @@ handle_cast({join, {GameId, Source}}, History) ->
 			{noreply, NewHistory};
 		_Error ->
 			{noreply, History}
-	end.
+	end;
+
+%% Leaves the current game, for a reason
+
+handle_cast({leave, Reason}, History) ->
+	NewHistory = sdd_history:append(History, leave, Reason),
+	{noreply, NewHistory}.
 
 %% ------------------------------------------------------------------------------------- %%
 %% Returns continue_listening for events from our current game
@@ -119,6 +125,11 @@ realize_event(State, get_guess_reward, _Result) ->
 
 realize_event(State, join, {GameId, _Source}) ->
 	State#state{current_game = GameId};
+
+%% Reset current game
+
+realize_event(State, leave, _Reason) ->
+	State#state{current_game = undefined};
 
 %% Add a badge
 
