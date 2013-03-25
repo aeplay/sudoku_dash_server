@@ -259,6 +259,37 @@ handle_game_event_continuesListeningOnlyIfEventWasFromCurrentGame_test() ->
 		handle_call({game_event, "OtherGame", some_event, some_data}, HistoryAfterGoodJoin)
 	).
 
+handle_game_event_redirectsToCurrentClientIfExistsAndIfEventWasFromCurrentGame_test() ->
+	meck:new(sdd_game),
+	meck:expect(sdd_game, join, fun
+		(_PlayerId, "GoodGame", _Source) -> ok
+	end),
+
+	{ok, InitialHistory} = init({"Peter", "secret"}),
+	{noreply, HistoryAfterGoodJoin} = handle_cast({join, {"GoodGame", invite}}, InitialHistory),
+
+	meck:unload(sdd_game),
+
+	%% Nothing should happen when event comes from wrong game, otherwise undef will be thrown here
+	handle_call({game_event, "BadGame", some_event, some_data}, HistoryAfterGoodJoin),
+
+	%% Nothing should happen with no client, otherwise undef will be thrown here
+	handle_call({game_event, "GoodGame", some_event, some_data}, HistoryAfterGoodJoin),
+
+	meck:new(sdd_client),
+	meck:expect(sdd_client, handle_event, fun
+		("ClientA", game_event, "GoodGame", some_event, some_data) -> ok
+	end),
+
+	handle_call({game_event, "GoodGame", some_event, some_data}, HistoryAfterGoodJoin),
+
+	{ok, HistoryAfterConnect} = handle_call({connect, "ClientA", "ClientAInfo"}, HistoryAfterGoodJoin),
+	handle_call({game_event, "GoodGame", some_event, some_data}, HistoryAfterConnect),
+	?assert(meck:called(sdd_client, handle_event, ["ClientA", game_event, "GoodGame", some_event, some_data])),
+	?assert(meck:validate(sdd_client)),
+	meck:unload(sdd_client).
+
+
 handle_game_event_guess_SavesOwnPositiveGuessResultAndIncreasesPoints_test() ->
 	meck:new(sdd_game),
 	meck:expect(sdd_game, join, fun
