@@ -62,7 +62,8 @@ handle_cast({join, {GameId, Source}}, History) ->
 	end.
 
 %% ------------------------------------------------------------------------------------- %%
-%% Saves own positive guess results
+%% Returns continue_listening for events from our current game
+%% And saves own positive guess results
 
 handle_call({game_event, GameId, EventType, EventData}, History) ->
 	State = sdd_history:state(History),
