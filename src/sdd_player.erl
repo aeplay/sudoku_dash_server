@@ -162,6 +162,8 @@ realize_event(State, connect, {ClientId, _ClientInfo}) ->
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("sdd_history_test_macros.hrl").
+
 
 -define(init_peter, init({"Peter", "secret"})).
 
@@ -174,16 +176,6 @@ init_createsNewPlayerWithNameAndSecret_test() ->
 
 	Past = sdd_history:past(InitialHistory),
 	?assertMatch([{_Time, register, {"Peter", "secret"}}], Past).
-
--define(assert_state_field_equals(History, Field, ExpectedValue),
-	State = sdd_history:state(History),
-	?assertEqual(State#state.Field, ExpectedValue)
-).
-
--define(assert_past_matches(History, ExpectedMatch),
-	Past = sdd_history:past(History),
-	?assertMatch(ExpectedMatch, Past)
-).
 
 -define(meck_sdd_game_join,
 	meck:new(sdd_game),
@@ -209,8 +201,8 @@ join_notifiesGameWeWantToJoinAndSavesGameAsCurrentGameIfSuccessful_test() ->
 	?assert(meck:validate(sdd_game)),
 	meck:unload(sdd_game),
 
-	?assert_state_field_equals(HistoryAfterGoodJoin, current_game, "GoodGame"),
-	?assert_past_matches(HistoryAfterGoodJoin, [{_Time, join, {"GoodGame", invite}} | _ ]).
+	?history_assert_state_field_equals(HistoryAfterGoodJoin, current_game, "GoodGame"),
+	?history_assert_past_matches(HistoryAfterGoodJoin, [{_Time, join, {"GoodGame", invite}} | _ ]).
 
 -define(init_peter_and_join_good_game,
 	fun () ->
@@ -228,12 +220,12 @@ leave_resetsCurrentGame_test() ->
 	end),
 
 	{noreply, HistoryAfterLeaving} = handle_cast({leave, timeout}, HistoryAfterGoodJoin),
-	
+
 	?assert(meck:called(sdd_game, leave, ["Peter", "GoodGame", timeout])),
 	meck:unload(sdd_game),
 	
-	?assert_state_field_equals(HistoryAfterLeaving, current_game, undefined),
-	?assert_past_matches(HistoryAfterLeaving, [{_Time, leave, timeout} | _ ]).
+	?history_assert_state_field_equals(HistoryAfterLeaving, current_game, undefined),
+	?history_assert_past_matches(HistoryAfterLeaving, [{_Time, leave, timeout} | _ ]).
 
 leave_notifiesGameThatWeLeft_test() ->	
 	?meck_sdd_game_join,
@@ -304,11 +296,8 @@ handle_game_event_guess_SavesOwnPositiveGuessResultAndIncreasesPoints_test() ->
 
 	{continue_listening, HistoryAfterOwnPositiveGuess} = handle_call({game_event, "GoodGame", guess, {"Peter", 34, 3, {good}}}, HistoryAfterGoodJoin),
 	
-	State = sdd_history:state(HistoryAfterOwnPositiveGuess),
-	?assertEqual(State#state.points, 1),
-	
-	Past = sdd_history:past(HistoryAfterOwnPositiveGuess),
-	?assertMatch([{_Time, get_guess_reward, {good}} | _ ], Past).
+	?history_assert_state_field_equals(HistoryAfterOwnPositiveGuess, points, 1),
+	?history_assert_past_matches(HistoryAfterOwnPositiveGuess, [{_Time, get_guess_reward, {good}} | _ ]).
 
 get_badge_addsABadge_test() ->
 	{ok, InitialHistory} = ?init_peter,
@@ -319,20 +308,14 @@ get_badge_addsABadge_test() ->
 	{noreply, HistoryAfterGettingFirstBadge} = handle_call({get_badge, Badge1}, InitialHistory),
 	{noreply, HistoryAfterGettingSecondBadge} = handle_call({get_badge, Badge2}, HistoryAfterGettingFirstBadge),
 	
-	State = sdd_history:state(HistoryAfterGettingSecondBadge),
-	?assertEqual(State#state.badges, [Badge2, Badge1]),
-
-	Past = sdd_history:past(HistoryAfterGettingSecondBadge),
-	?assertMatch([{_Time2, get_badge, Badge2}, {_Time1, get_badge, Badge1} | _ ], Past).
+	?history_assert_state_field_equals(HistoryAfterGettingSecondBadge, badges, [Badge2, Badge1]),
+	?history_assert_past_matches(HistoryAfterGettingSecondBadge, [{_Time2, get_badge, Badge2}, {_Time1, get_badge, Badge1} | _ ]).
 
 connect_setsNewClient_test() ->
 	{ok, InitialHistory} = ?init_peter,
 	{ok, HistoryAfterConnect} = handle_call({connect, "ClientA", "ClientAInfo"}, InitialHistory),
 
-	State = sdd_history:state(HistoryAfterConnect),
-	?assertEqual(State#state.current_client, "ClientA"),
-
-	Past = sdd_history:past(HistoryAfterConnect),
-	?assertMatch([{_Time, connect, {"ClientA", "ClientAInfo"}} | _ ], Past).
+	?history_assert_state_field_equals(HistoryAfterConnect, current_client, "ClientA"),
+	?history_assert_past_matches(HistoryAfterConnect, [{_Time, connect, {"ClientA", "ClientAInfo"}} | _ ]).
 
 -endif.
