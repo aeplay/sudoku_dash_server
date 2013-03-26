@@ -13,7 +13,7 @@
 -module(sdd_player).
 
 %% API
--export([handle_game_event/3]).
+-export([handle_game_event/4]).
 
 %% Records
 -record(state, {
@@ -29,8 +29,8 @@
 %%% API                                                                                 %%%
 %%% =================================================================================== %%%
 
-handle_game_event(PlayerId, EventType, EventData) ->
-	try gen_server:call(PlayerId, {game_event, EventType, EventData}, 100) of
+handle_game_event(PlayerId, GameId, EventType, EventData) ->
+	try gen_server:call(PlayerId, {game_event, GameId, EventType, EventData}, 100) of
 		Reply -> Reply
 	catch
 		Error -> Error
