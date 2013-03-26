@@ -68,6 +68,12 @@ handle_cast({leave, Reason}, History) ->
 	State = sdd_history:state(History),
 	sdd_game:leave(State#state.name, State#state.current_game, Reason),
 	NewHistory = sdd_history:append(History, leave, Reason),
+	{noreply, NewHistory};
+
+%% Increases a player's points by a given amount
+
+handle_cast({get_points, Increase}, History) ->	
+	NewHistory = sdd_history:append(History, get_points, Increase),
 	{noreply, NewHistory}.
 
 %% ------------------------------------------------------------------------------------- %%
@@ -136,6 +142,11 @@ realize_event(State, leave, _Reason) ->
 
 realize_event(State, get_badge, Badge) ->
 	State#state{badges = [Badge | State#state.badges]};
+
+%% Get points
+
+realize_event(State, get_points, Increase) ->
+	State#state{points = State#state.points + Increase};
 
 %% Set new client
 
