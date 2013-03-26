@@ -171,7 +171,7 @@ leave_createsLeaveEventAndLeavesStateAlone_test() ->
 	?history_assert_past_matches(HistoryAfterLeave, [{_Time, leave, {"Peter", fell_asleep}}]),
 	?history_assert_states_equal(DummyHistory, HistoryAfterLeave).
 
-guess_updatesBoardOnCorrectGuess_test() ->
+guess_updatesBoardOnCorrectGuessAndGivesPlayerAPoint_test() ->
 	InitialBoard = array:from_list(
 		[4,1,6,5,2,0,8,9,3,
 		 5,9,2,8,3,6,1,4,7,
@@ -185,7 +185,17 @@ guess_updatesBoardOnCorrectGuess_test() ->
 	),
 	DummyHistory = sdd_history:new(fun realize_event/3),
 	InitialHistory = sdd_history:append(DummyHistory, start, InitialBoard),
+
+	meck:new(sdd_player),
+	meck:expect(sdd_player, get_points, fun
+		(_PlayerId, _Increase) -> ok
+	end),
+
 	{noreply, HistoryAfterGuess} = handle_cast({guess, "Peter", {27, 1}}, InitialHistory),
+
+	?assert(meck:called(sdd_player, get_points, ["Peter", 1])),
+	?assert(meck:validate(sdd_player)),
+	meck:unload(sdd_player),
 	
 	State = sdd_history:state(HistoryAfterGuess),
 	?assertEqual(1, array:get(27, State#state.board)),
