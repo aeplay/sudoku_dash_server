@@ -11,6 +11,9 @@
 
 -module(sdd_game).
 
+%% API
+-export([join/3, do/4]).
+
 %% Records
 -record(state, {
 	board,
@@ -26,6 +29,17 @@
 -else.
 -define(TIMEOUT_AFTER_COMPLETE, 10000).
 -endif.
+
+
+%%% =================================================================================== %%%
+%%% API                                                                                 %%%
+%%% =================================================================================== %%%
+
+join(GameId, PlayerId, Source) ->
+	gen_server:call(GameId, {join, PlayerId, Source}).
+
+do(GameId, PlayerId, Action, Args) ->
+	gen_server:cast(GameId, {Action, PlayerId, Args}).
 
 %%% =================================================================================== %%%
 %%% GEN_SERVER CALLBACKS                                                                %%%
