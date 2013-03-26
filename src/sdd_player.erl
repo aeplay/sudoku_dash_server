@@ -13,7 +13,7 @@
 -module(sdd_player).
 
 %% API
--export([handle_game_event/4]).
+-export([join/3, leave/2, get_points/2, get_badge/2, handle_game_event/4, connect/3]).
 
 %% Records
 -record(state, {
@@ -29,12 +29,27 @@
 %%% API                                                                                 %%%
 %%% =================================================================================== %%%
 
+join(PlayerId, GameId, Source) ->
+	gen_server:cast(PlayerId, {join, {GameId, Source}}).
+
+leave(PlayerId, Reason) ->
+	gen_server:cast(PlayerId, {leave, Reason}).
+
+get_points(PlayerId, Increase) ->
+	gen_server:cast(PlayerId, {get_points, Increase}).
+
+get_badge(PlayerId, Badge) ->	
+	gen_server:cast(PlayerId, {get_badge, Badge}).
+
 handle_game_event(PlayerId, GameId, EventType, EventData) ->
 	try gen_server:call(PlayerId, {game_event, GameId, EventType, EventData}, 100) of
 		Reply -> Reply
 	catch
 		Error -> Error
 	end.
+
+connect(PlayerId, ClientId, ClientInfo) ->	
+	gen_server:call(PlayerId, {connect, ClientId, ClientInfo}).
 
 %%% =================================================================================== %%%
 %%% GEN_SERVER CALLBACKS                                                                %%%
