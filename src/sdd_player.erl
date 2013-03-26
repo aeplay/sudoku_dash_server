@@ -278,6 +278,14 @@ handle_game_event_redirectsToCurrentClientIfExistsAndIfEventWasFromCurrentGame_t
 	?assert(meck:validate(sdd_client)),
 	meck:unload(sdd_client).
 
+get_points_addsPoints_test() ->
+	{ok, InitialHistory} = ?init_peter,
+
+	{noreply, HistoryAfterGettingPoints} = handle_cast({get_points, 3}, InitialHistory),
+
+	?history_assert_state_field_equals(HistoryAfterGettingPoints, points, 3),
+	?history_assert_past_matches(HistoryAfterGettingPoints, [{_Time, get_points, 3} | _ ]).
+
 get_badge_addsABadge_test() ->
 	{ok, InitialHistory} = ?init_peter,
 
