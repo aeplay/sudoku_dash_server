@@ -11,7 +11,7 @@
 -module(sdd_client).
 
 %% Records
--record(
+-record(state, {
 	current_player,
 	current_game,
 	current_client,
