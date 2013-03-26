@@ -12,7 +12,7 @@
 
 %% Records
 -record(state, {
-	current_player,
+	player,
 	current_game,
 	current_client,
 	current_client_active,
