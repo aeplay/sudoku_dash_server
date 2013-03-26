@@ -72,36 +72,18 @@ handle_cast({leave, Reason}, History) ->
 
 %% ------------------------------------------------------------------------------------- %%
 %% Returns continue_listening for events from our current game
-%% And saves own positive guess results
+%% and redirects them to the client
 
 handle_call({game_event, GameId, EventType, EventData}, History) ->
 	State = sdd_history:state(History),
 	CurrentGame = State#state.current_game,
-	MyName = State#state.name,
 	case GameId of
 		CurrentGame ->
 			case State#state.current_client of
 				undefined -> do_nothing;
 				ClientId -> sdd_client:handle_game_event(ClientId, GameId, EventType, EventData)
 			end,
-			case EventType of
-				guess ->
-					{Name, _Position, _Number, Result} = EventData,
-					case Name of
-						MyName ->
-							case Result of
-								{good} ->
-									NewHistory = sdd_history:append(History, get_guess_reward, Result),
-									{continue_listening, NewHistory};
-								_NotGood ->	
-									{continue_listening, History}
-							end;
-						_SomeoneElse ->
-							{continue_listening, History}
-					end;
-				_OtherEvent ->
-					{continue_listening, History}
-				end;
+			{continue_listening, History};
 		_WrongGame ->
 			{wrong_game, History}
 	end;
@@ -295,24 +277,6 @@ handle_game_event_redirectsToCurrentClientIfExistsAndIfEventWasFromCurrentGame_t
 	?assert(meck:called(sdd_client, handle_game_event, ["ClientA", "GoodGame", some_event, some_data])),
 	?assert(meck:validate(sdd_client)),
 	meck:unload(sdd_client).
-
-
-handle_game_event_guess_SavesOwnPositiveGuessResultAndIncreasesPoints_test() ->
-	?meck_sdd_game_join,
-	{noreply, HistoryAfterGoodJoin} = ?init_peter_and_join_good_game,
-
-	meck:unload(sdd_game),
-
-	{continue_listening, HistoryAfterSomeonesGuess} = handle_call({game_event, "GoodGame", guess, {"SomeoneElse", 34, 3, {good}}}, HistoryAfterGoodJoin),
-	?assertEqual(HistoryAfterSomeonesGuess, HistoryAfterGoodJoin),
-
-	{continue_listening, HistoryAfterOwnNegativeGuess} = handle_call({game_event, "GoodGame", guess, {"Peter", 34, 4, {not_good}}}, HistoryAfterGoodJoin),
-	?assertEqual(HistoryAfterOwnNegativeGuess, HistoryAfterGoodJoin),	
-
-	{continue_listening, HistoryAfterOwnPositiveGuess} = handle_call({game_event, "GoodGame", guess, {"Peter", 34, 3, {good}}}, HistoryAfterGoodJoin),
-	
-	?history_assert_state_field_equals(HistoryAfterOwnPositiveGuess, points, 1),
-	?history_assert_past_matches(HistoryAfterOwnPositiveGuess, [{_Time, get_guess_reward, {good}} | _ ]).
 
 get_badge_addsABadge_test() ->
 	{ok, InitialHistory} = ?init_peter,
