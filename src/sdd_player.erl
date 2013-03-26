@@ -310,9 +310,26 @@ get_badge_addsABadge_test() ->
 	?history_assert_state_field_equals(HistoryAfterGettingSecondBadge, badges, [Badge2, Badge1]),
 	?history_assert_past_matches(HistoryAfterGettingSecondBadge, [{_Time2, get_badge, Badge2}, {_Time1, get_badge, Badge1} | _ ]).
 
-connect_setsNewClient_test() ->
+connect_setsNewClientAndMakesClientAListenerOfPlayerHistory_test() ->
 	{ok, InitialHistory} = ?init_peter,
+
+	meck:new(sdd_client),
+	meck:expect(sdd_client, handle_event, fun
+		(_ClientId, player_event, _EventType, _EventData) -> ok
+	end),
+	meck:expect(sdd_client, sync_player_state, fun
+		(_ClientId, _PlayerState) -> ok
+	end),
+
 	{ok, HistoryAfterConnect} = handle_call({connect, "ClientA", "ClientAInfo"}, InitialHistory),
+
+	% make sure client gets player state without secret field
+	StateAfterConnect = sdd_history:state(HistoryAfterConnect),
+	?assert(meck:called(sdd_client, sync_player_state, ["ClientA", StateAfterConnect#state{secret = undefined}]))
+
+	?assert(meck:called(sdd_client, handle_event, ["ClientA", player_event, connect, {"ClientA", "ClientAInfo"}])),
+	?assert(meck:validate(sdd_client)),
+	meck:unload(sdd_client),
 
 	?history_assert_state_field_equals(HistoryAfterConnect, current_client, "ClientA"),
 	?history_assert_past_matches(HistoryAfterConnect, [{_Time, connect, {"ClientA", "ClientAInfo"}} | _ ]).
