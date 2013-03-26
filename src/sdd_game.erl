@@ -104,7 +104,8 @@ realize_event(_EmptyState, start, InitialBoard) ->
 
 %% Update the board and candidates after a good guess, check if it is complete
 
-realize_event(State, guess, {_PlayerId, Position, Number, {good}}) ->
+realize_event(State, guess, {PlayerId, Position, Number, {good}}) ->
+	sdd_player:get_points(PlayerId, 1),
 	NewBoard = array:set(Position, Number, State#state.board),
 	NewCandidates = sdd_logic:calculate_candidates(NewBoard, ?CANDIDATE_SOPHISTICATION),
 	Complete = sdd_logic:is_complete(NewBoard),
