@@ -144,6 +144,20 @@ realize_event(State, leave, _) -> State.
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("sdd_history_test_macros.hrl").
 
+-define(example_board, 
+	array:from_list(
+		[4,1,6,5,2,0,8,9,3,
+		 5,9,2,8,3,6,1,4,7,
+		 8,7,3,4,9,1,2,6,5,
+		 0,4,8,2,6,5,3,7,9,
+		 6,5,7,3,1,9,4,8,2,
+		 2,3,9,7,8,4,6,5,1,
+		 3,6,1,9,5,8,7,2,4,
+		 7,8,5,1,4,2,9,0,6,
+		 9,2,4,6,7,3,5,1,8]
+	)
+).
+
 init_returnsHistoryWithInitialBoardAndCandidates_test() ->
 	{ok, InitialHistory} = init(no_options),
 	State = sdd_history:state(InitialHistory),
@@ -159,23 +173,27 @@ chat_addsChatMessageToHistory_test() ->
 	{noreply, HistoryAfterChat} = handle_cast({chat, "Peter", "Hello"}, DummyHistory),
 	?history_assert_past_matches(HistoryAfterChat, [{_Time, chat, {"Peter", "Hello"}}]).
 
-join_createsJoinEventAndLeavesStateAlone_test() ->
+join_createsJoinEvent_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
+	InitialHistory = sdd_history:append(DummyHistory, start, ?example_board),
 	meck:new(sdd_player),
 	meck:expect(sdd_player, handle_game_event, fun(_, _, _) -> continue_listening end),
 
-	{ok, HistoryAfterJoin} = handle_call({join, "Peter", random}, from, DummyHistory),
-	?history_assert_past_matches(HistoryAfterJoin, [{_Time, join, {"Peter", random}}]),
-	?history_assert_states_equal(DummyHistory, HistoryAfterJoin),
+	{ok, HistoryAfterJoin} = handle_call({join, "Peter", random}, from, InitialHistory),
+	?history_assert_past_matches(HistoryAfterJoin, [{_Time, join, {"Peter", random}} | _]),
 
 	meck:unload(sdd_player).
 
 join_failsIfGameIsFull_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
+	InitialHistory = sdd_history:append(DummyHistory, start, ?example_board),
 	meck:new(sdd_player),
 	meck:expect(sdd_player, handle_game_event, fun(_, _, _) -> continue_listening end),
 
-	{ok, HistoryAfterFirstJoin} = handle_call({join, "Peter", random}, from, DummyHistory),
+	{ok, HistoryAfterFirstJoin} = handle_call({join, "Peter", random}, from, InitialHistory),
+
+	?history_assert_state_field_equals(HistoryAfterFirstJoin, n_players, 1),
+
 	{Response, HistoryAfterSecondJoin} = handle_call({join, "Paul", random}, from, HistoryAfterFirstJoin),
 
 	?assertEqual(game_full, Response),
@@ -185,10 +203,11 @@ join_failsIfGameIsFull_test() ->
 
 join_addsPlayerListenerFunctionToHistory_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
+	InitialHistory = sdd_history:append(DummyHistory, start, ?example_board),
 	meck:new(sdd_player),
 	meck:expect(sdd_player, handle_game_event, fun("Peter", join, {"Peter", random}) -> continue_listening end),
 
-	{ok, _HistoryAfterJoin} = handle_call({join, "Peter", random}, from, DummyHistory),
+	{ok, _HistoryAfterJoin} = handle_call({join, "Peter", random}, from, InitialHistory),
 
 	?assert(meck:validate(sdd_player)),
 	meck:unload(sdd_player).
