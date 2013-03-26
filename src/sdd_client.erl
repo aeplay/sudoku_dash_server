@@ -24,6 +24,20 @@
 %%% GEN_SERVER CALLBACKS                                                                %%%
 %%% =================================================================================== %%%
 
+%% ------------------------------------------------------------------------------------- %%
+%% Creates a new client with the given initial connection, and client info
+%% Connects to the given player
+
+init({Connection, ConnectionActive, ClientId, ClientInfo, PlayerId}) ->
+	InitialState = #state{
+		current_connection = Connection,
+		current_connection_active = ConnectionActive,
+		id = ClientId,
+		player = PlayerId
+	},
+	sdd_player:connect(PlayerId, ClientId, ClientInfo),
+	{ok, InitialState}.
+
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
 %%% =================================================================================== %%%
