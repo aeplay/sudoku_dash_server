@@ -117,7 +117,12 @@ handle_call({get_badge, Badge}, History) ->
 %% Connects a new client
 
 handle_call({connect, ClientId, ClientInfo}, History) ->
-	NewHistory = sdd_history:append(History, connect, {ClientId, ClientInfo}),
+	ListenerFunction = fun
+		(state, PlayerState) -> sdd_client:sync_player_state(ClientId, sdd_client:extract_interesting_state(PlayerState));
+		(event, {_Time, EventType, EventData}) -> sdd_client:handle_player_event(ClientId, EventType, EventData)
+	end,
+	HistoryWithListener = sdd_history:add_listener(History, ListenerFunction, tell_state),
+	NewHistory = sdd_history:append(HistoryWithListener, connect, {ClientId, ClientInfo}),
 	{ok, NewHistory}.
 
 %%% =================================================================================== %%%
