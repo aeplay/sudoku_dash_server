@@ -74,6 +74,13 @@ handle_cast({leave, Reason}, History) ->
 
 handle_cast({get_points, Increase}, History) ->	
 	NewHistory = sdd_history:append(History, get_points, Increase),
+	{noreply, NewHistory};
+
+%% ------------------------------------------------------------------------------------- %%
+%% Adds a badge
+
+handle_cast({get_badge, Badge}, History) ->
+	NewHistory = sdd_history:append(History, get_badge, Badge),
 	{noreply, NewHistory}.
 
 %% ------------------------------------------------------------------------------------- %%
@@ -93,13 +100,6 @@ handle_call({game_event, GameId, EventType, EventData}, History) ->
 		_WrongGame ->
 			{wrong_game, History}
 	end;
-
-%% ------------------------------------------------------------------------------------- %%
-%% Adds a badge
-
-handle_call({get_badge, Badge}, History) ->
-	NewHistory = sdd_history:append(History, get_badge, Badge),
-	{noreply, NewHistory};
 
 %% ------------------------------------------------------------------------------------- %%
 %% Connects a new client
@@ -303,8 +303,8 @@ get_badge_addsABadge_test() ->
 	Badge1 = {"Good Test Subject", "For being an important part of these unit tests"},
 	Badge2 = {"Good Person", "For having a beautiful personality"},
 
-	{noreply, HistoryAfterGettingFirstBadge} = handle_call({get_badge, Badge1}, InitialHistory),
-	{noreply, HistoryAfterGettingSecondBadge} = handle_call({get_badge, Badge2}, HistoryAfterGettingFirstBadge),
+	{noreply, HistoryAfterGettingFirstBadge} = handle_cast({get_badge, Badge1}, InitialHistory),
+	{noreply, HistoryAfterGettingSecondBadge} = handle_cast({get_badge, Badge2}, HistoryAfterGettingFirstBadge),
 	
 	?history_assert_state_field_equals(HistoryAfterGettingSecondBadge, badges, [Badge2, Badge1]),
 	?history_assert_past_matches(HistoryAfterGettingSecondBadge, [{_Time2, get_badge, Badge2}, {_Time1, get_badge, Badge1} | _ ]).
