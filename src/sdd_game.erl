@@ -127,6 +127,7 @@ realize_event(State, leave, _) -> State.
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("sdd_history_test_macros.hrl").
 
 init_returnsHistoryWithInitialBoardAndCandidates_test() ->
 	{ok, InitialHistory} = init(no_options),
@@ -136,14 +137,12 @@ init_returnsHistoryWithInitialBoardAndCandidates_test() ->
 	?assertEqual(false, State#state.complete),
 
 	Board = State#state.board,
-	Past = sdd_history:past(InitialHistory),
-	?assertMatch([{_Time, start, Board}], Past).
+	?history_assert_past_matches(InitialHistory, [{_Time, start, Board}]).
 
 chat_addsChatMessageToHistory_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
 	{noreply, HistoryAfterChat} = handle_cast({chat, "Peter", "Hello"}, DummyHistory),
-	Past = sdd_history:past(HistoryAfterChat),
-	?assertMatch([{_Time, chat, {"Peter", "Hello"}}], Past).
+	?history_assert_past_matches(HistoryAfterChat, [{_Time, chat, {"Peter", "Hello"}}]).
 
 join_createsJoinEventAndLeavesStateAlone_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
@@ -151,9 +150,8 @@ join_createsJoinEventAndLeavesStateAlone_test() ->
 	meck:expect(sdd_player, handle_game_event, fun(_, _, _) -> continue_listening end),
 
 	{ok, HistoryAfterJoin} = handle_call({join, "Peter", random}, DummyHistory),
-	Past = sdd_history:past(HistoryAfterJoin),
-	?assertMatch([{_Time, join, {"Peter", random}}], Past),
-	?assertEqual(sdd_history:state(DummyHistory), sdd_history:state(HistoryAfterJoin)),
+	?history_assert_past_matches(HistoryAfterJoin, [{_Time, join, {"Peter", random}}]),
+	?history_assert_states_equal(DummyHistory, HistoryAfterJoin),
 
 	meck:unload(sdd_player).
 
@@ -170,9 +168,8 @@ join_addsPlayerListenerFunctionToHistory_test() ->
 leave_createsLeaveEventAndLeavesStateAlone_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
 	{noreply, HistoryAfterLeave} = handle_cast({leave, "Peter", fell_asleep}, DummyHistory),
-	Past = sdd_history:past(HistoryAfterLeave),
-	?assertMatch([{_Time, leave, {"Peter", fell_asleep}}], Past),
-	?assertEqual(sdd_history:state(DummyHistory), sdd_history:state(HistoryAfterLeave)).
+	?history_assert_past_matches(HistoryAfterLeave, [{_Time, leave, {"Peter", fell_asleep}}]),
+	?history_assert_states_equal(DummyHistory, HistoryAfterLeave).
 
 guess_updatesBoardOnCorrectGuess_test() ->
 	InitialBoard = array:from_list(
@@ -193,8 +190,7 @@ guess_updatesBoardOnCorrectGuess_test() ->
 	State = sdd_history:state(HistoryAfterGuess),
 	?assertEqual(1, array:get(27, State#state.board)),
 
-	[LastEvent|_Rest] = sdd_history:past(HistoryAfterGuess),
-	?assertMatch({_Time, guess, {"Peter", 27, 1, {good}}}, LastEvent).
+	?history_assert_past_matches(HistoryAfterGuess, [{_Time, guess, {"Peter", 27, 1, {good}}} | _ ]).
 
 guess_addsGuessToHistoryButLeavesBoardAloneOnInvalidGuess_test() ->
 	InitialBoard = array:from_list(
@@ -210,14 +206,10 @@ guess_addsGuessToHistoryButLeavesBoardAloneOnInvalidGuess_test() ->
 	),
 	DummyHistory = sdd_history:new(fun realize_event/3),
 	InitialHistory = sdd_history:append(DummyHistory, start, InitialBoard),
-	InitialState = sdd_history:state(InitialHistory),
+
 	{noreply, HistoryAfterGuess} = handle_cast({guess, "Peter", {27, 3}}, InitialHistory),
-
-	StateAfterGuess = sdd_history:state(HistoryAfterGuess),
-	?assertEqual(StateAfterGuess, InitialState),
-
-	[LastEvent|_Rest] = sdd_history:past(HistoryAfterGuess),
-	?assertMatch({_Time, guess, {"Peter", 27, 3, {bad, _Conflicts}}}, LastEvent).
+	?history_assert_past_matches(HistoryAfterGuess, [{_Time, guess, {"Peter", 27, 3, {bad, _Conflicts}}} | _ ]),
+	?history_assert_states_equal(InitialHistory, HistoryAfterGuess).
 
 guess_markGameAsCompleteAndTimeoutIfComplete_test() ->
 	InitialBoard = array:from_list(
@@ -236,8 +228,7 @@ guess_markGameAsCompleteAndTimeoutIfComplete_test() ->
 	InitialHistory = sdd_history:append(DummyHistory, start, InitialBoard),
 	{noreply, HistoryAfterGuess} = handle_cast({guess, "Peter", {27, 1}}, InitialHistory),
 
-	StateAfterGuess = sdd_history:state(HistoryAfterGuess),
-	?assertEqual(true, StateAfterGuess#state.complete),
+	?history_assert_state_field_equals(HistoryAfterGuess, complete, true),
 
 	receive
 		stop_complete ->

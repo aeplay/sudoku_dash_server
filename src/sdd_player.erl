@@ -170,12 +170,11 @@ realize_event(State, connect, {ClientId, _ClientInfo}) ->
 init_createsNewPlayerWithNameAndSecret_test() ->
 	{ok, InitialHistory} = ?init_peter,
 	State = sdd_history:state(InitialHistory),
-	?assertEqual(State#state.name, "Peter"),
-	?assertEqual(State#state.secret, "secret"),
-	?assertEqual(State#state.points, 0),
 
-	Past = sdd_history:past(InitialHistory),
-	?assertMatch([{_Time, register, {"Peter", "secret"}}], Past).
+	?history_assert_state_field_equals(InitialHistory, name, "Peter"),
+	?history_assert_state_field_equals(InitialHistory, secret, "secret"),
+	?history_assert_state_field_equals(InitialHistory, points, 0),
+	?history_assert_past_matches(InitialHistory, [{_Time, register, {"Peter", "secret"}}]).
 
 -define(meck_sdd_game_join,
 	meck:new(sdd_game),
