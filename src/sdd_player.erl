@@ -87,7 +87,7 @@ handle_cast({get_badge, Badge}, History) ->
 %% Returns continue_listening for events from our current game
 %% and redirects them to the client
 
-handle_call({game_event, GameId, EventType, EventData}, History) ->
+handle_call({game_event, GameId, EventType, EventData}, _From, History) ->
 	State = sdd_history:state(History),
 	CurrentGame = State#state.current_game,
 	case GameId of
@@ -104,7 +104,7 @@ handle_call({game_event, GameId, EventType, EventData}, History) ->
 %% ------------------------------------------------------------------------------------- %%
 %% Connects a new client
 
-handle_call({connect, ClientId, ClientInfo}, History) ->
+handle_call({connect, ClientId, ClientInfo}, _From, History) ->
 	ListenerFunction = fun
 		(state, PlayerState) -> sdd_client:sync_player_state(ClientId, sdd_client:extract_interesting_state(PlayerState));
 		(event, {_Time, EventType, EventData}) -> sdd_client:handle_player_event(ClientId, EventType, EventData)
@@ -241,11 +241,11 @@ handle_game_event_continuesListeningOnlyIfEventWasFromCurrentGame_test() ->
 
 	?assertMatch(
 		{continue_listening, _NewHistory},
-		handle_call({game_event, "GoodGame", some_event, some_data}, HistoryAfterGoodJoin)
+		handle_call({game_event, "GoodGame", some_event, some_data}, from, HistoryAfterGoodJoin)
 	),
 	?assertMatch(
 		{wrong_game, _NewHistory},
-		handle_call({game_event, "OtherGame", some_event, some_data}, HistoryAfterGoodJoin)
+		handle_call({game_event, "OtherGame", some_event, some_data}, from, HistoryAfterGoodJoin)
 	).
 
 -define(meck_sdd_client, 
@@ -271,15 +271,15 @@ handle_game_event_redirectsToCurrentClientIfExistsAndIfEventWasFromCurrentGame_t
 	meck:unload(sdd_game),
 
 	%% Nothing should happen when event comes from wrong game, otherwise undef will be thrown here
-	handle_call({game_event, "BadGame", some_event, some_data}, HistoryAfterGoodJoin),
+	handle_call({game_event, "BadGame", some_event, some_data}, from, HistoryAfterGoodJoin),
 
 	%% Nothing should happen with no client, otherwise undef will be thrown here
-	handle_call({game_event, "GoodGame", some_event, some_data}, HistoryAfterGoodJoin),
+	handle_call({game_event, "GoodGame", some_event, some_data}, from, HistoryAfterGoodJoin),
 
 	?meck_sdd_client,
 
-	{ok, HistoryAfterConnect} = handle_call({connect, "ClientA", "ClientAInfo"}, HistoryAfterGoodJoin),
-	handle_call({game_event, "GoodGame", some_event, some_data}, HistoryAfterConnect),
+	{ok, HistoryAfterConnect} = handle_call({connect, "ClientA", "ClientAInfo"}, from, HistoryAfterGoodJoin),
+	handle_call({game_event, "GoodGame", some_event, some_data}, from, HistoryAfterConnect),
 	?assert(meck:called(sdd_client, handle_game_event, ["ClientA", "GoodGame", some_event, some_data])),
 	?assert(meck:validate(sdd_client)),
 	meck:unload(sdd_client).
@@ -312,7 +312,7 @@ connect_setsNewClientAndMakesClientAListenerOfPlayerHistory_test() ->
 	% make sure client gets player state without secret field
 	StateBeforeConnect = sdd_history:state(InitialHistory),
 
-	{ok, HistoryAfterConnect} = handle_call({connect, "ClientA", "ClientAInfo"}, InitialHistory),
+	{ok, HistoryAfterConnect} = handle_call({connect, "ClientA", "ClientAInfo"}, from, InitialHistory),
 
 	?assert(meck:called(sdd_client, sync_player_state, ["ClientA", sdd_client:extract_interesting_state(StateBeforeConnect)])),
 

@@ -44,7 +44,7 @@ init(_Opts) ->
 %% ------------------------------------------------------------------------------------- %%
 %% Adds a player to the game, by creating an appropriate listener function
 
-handle_call({join, PlayerId, Source}, History) ->
+handle_call({join, PlayerId, Source}, _From, History) ->
 	ListenerFunction = fun(event, {_Time, EventType, EventData}) ->
 		sdd_player:handle_game_event(PlayerId, EventType, EventData)
 	end,
@@ -150,7 +150,7 @@ join_createsJoinEventAndLeavesStateAlone_test() ->
 	meck:new(sdd_player),
 	meck:expect(sdd_player, handle_game_event, fun(_, _, _) -> continue_listening end),
 
-	{ok, HistoryAfterJoin} = handle_call({join, "Peter", random}, DummyHistory),
+	{ok, HistoryAfterJoin} = handle_call({join, "Peter", random}, from, DummyHistory),
 	?history_assert_past_matches(HistoryAfterJoin, [{_Time, join, {"Peter", random}}]),
 	?history_assert_states_equal(DummyHistory, HistoryAfterJoin),
 
@@ -161,7 +161,7 @@ join_addsPlayerListenerFunctionToHistory_test() ->
 	meck:new(sdd_player),
 	meck:expect(sdd_player, handle_game_event, fun("Peter", join, {"Peter", random}) -> continue_listening end),
 
-	{ok, _HistoryAfterJoin} = handle_call({join, "Peter", random}, DummyHistory),
+	{ok, _HistoryAfterJoin} = handle_call({join, "Peter", random}, from, DummyHistory),
 
 	?assert(meck:validate(sdd_player)),
 	meck:unload(sdd_player).
