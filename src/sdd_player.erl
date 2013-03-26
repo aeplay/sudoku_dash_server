@@ -181,7 +181,7 @@ init_createsNewPlayerWithNameAndSecret_test() ->
 ).
 
 -define(assert_past_matches(History, ExpectedMatch),
-	Past = sdd_history:past(HistoryAfterGoodJoin),
+	Past = sdd_history:past(History),
 	?assertMatch(ExpectedMatch, Past)
 ).
 
