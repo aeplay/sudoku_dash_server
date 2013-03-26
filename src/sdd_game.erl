@@ -170,6 +170,19 @@ join_createsJoinEventAndLeavesStateAlone_test() ->
 
 	meck:unload(sdd_player).
 
+join_failsIfGameIsFull_test() ->
+	DummyHistory = sdd_history:new(fun realize_event/3),
+	meck:new(sdd_player),
+	meck:expect(sdd_player, handle_game_event, fun(_, _, _) -> continue_listening end),
+
+	{ok, HistoryAfterFirstJoin} = handle_call({join, "Peter", random}, from, DummyHistory),
+	{Response, HistoryAfterSecondJoin} = handle_call({join, "Paul", random}, from, HistoryAfterFirstJoin),
+
+	?assertEqual(game_full, Response),
+	?assertEqual(HistoryAfterFirstJoin, HistoryAfterSecondJoin),
+
+	meck:unload(sdd_player).
+
 join_addsPlayerListenerFunctionToHistory_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
 	meck:new(sdd_player),
