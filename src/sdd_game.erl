@@ -236,7 +236,15 @@ guess_markGameAsCompleteAndTimeoutIfComplete_test() ->
 
 	DummyHistory = sdd_history:new(fun realize_event/3),
 	InitialHistory = sdd_history:append(DummyHistory, start, InitialBoard),
+
+	meck:new(sdd_player),
+	meck:expect(sdd_player, get_points, fun
+		(_PlayerId, _Increase) -> ok
+	end),
+
 	{noreply, HistoryAfterGuess} = handle_cast({guess, "Peter", {27, 1}}, InitialHistory),
+
+	meck:unload(sdd_player),
 
 	?history_assert_state_field_equals(HistoryAfterGuess, complete, true),
 
@@ -263,7 +271,15 @@ guess_ignoresGuessAfterComplete_test() ->
 
 	DummyHistory = sdd_history:new(fun realize_event/3),
 	InitialHistory = sdd_history:append(DummyHistory, start, InitialBoard),
+
+	meck:new(sdd_player),
+	meck:expect(sdd_player, get_points, fun
+		(_PlayerId, _Increase) -> ok
+	end),
+
 	{noreply, HistoryAfterCompletingGuess} = handle_cast({guess, "Peter", {27, 1}}, InitialHistory),
+
+	meck:unload(sdd_player),
 
 	{noreply, HistoryAfterNewGuess} = handle_cast({guess, "Peter", {27, 1}}, HistoryAfterCompletingGuess),
 	?assertEqual(HistoryAfterCompletingGuess, HistoryAfterNewGuess).
