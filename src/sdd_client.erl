@@ -12,11 +12,12 @@
 
 %% Records
 -record(state, {
-	player,
-	current_game,
+	id,
 	current_connection,
 	current_connection_active,
-	messages_for_client = []
+	messages_for_client = [],
+	player,
+	current_game
 }).
 
 %%% =================================================================================== %%%
@@ -44,6 +45,7 @@ init_createsNewClientForPlayerAndConnectsToHim_test() ->
 	?assert(meck:validate(sdd_player)),
 	meck:unload(sdd_player),
 
+	?assertEqual(InitialState#state.id, "ClientId"),
 	?assertEqual(InitialState#state.current_connection, "ConnectionA"),
 	?assertEqual(InitialState#state.current_connection_active, true),
 	?assertEqual(InitialState#state.player, "Peter").
