@@ -123,11 +123,6 @@ handle_call({connect, ClientId, ClientInfo}, History) ->
 realize_event(_EmptyState, register, {Name, Secret}) ->
 	#state{name = Name, secret = Secret, points = 0};
 
-%% Increase points on good guess result
-
-realize_event(State, get_guess_reward, _Result) ->
-	State#state{points = State#state.points + 1};
-
 %% Change current game
 
 realize_event(State, join, {GameId, _Source}) ->
