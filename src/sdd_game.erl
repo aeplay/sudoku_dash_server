@@ -227,11 +227,19 @@ join_addsPlayerListenerFunctionToHistory_test() ->
 	?assert(meck:validate(sdd_player)),
 	meck:unload(sdd_player).
 
-leave_createsLeaveEventAndLeavesStateAlone_test() ->
+leave_createsLeaveEventAndMakesGameEmptier_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
-	{noreply, HistoryAfterLeave} = handle_cast({leave, "Peter", fell_asleep}, DummyHistory),
-	?history_assert_past_matches(HistoryAfterLeave, [{_Time, leave, {"Peter", fell_asleep}}]),
-	?history_assert_states_equal(DummyHistory, HistoryAfterLeave).
+	InitialHistory = sdd_history:append(DummyHistory, start, ?example_board),
+
+	meck:new(sdd_player),
+	meck:expect(sdd_player, handle_game_event, fun(_, _, _) -> continue_listening end),
+
+	{reply, ok, HistoryAfterJoin} = handle_call({join, "Peter", random}, from, InitialHistory),
+	{noreply, HistoryAfterLeave} = handle_cast({leave, "Peter", fell_asleep}, HistoryAfterJoin),
+	meck:unload(sdd_player),
+	
+	?history_assert_state_field_equals(HistoryAfterLeave, n_players, 0),
+	?history_assert_past_matches(HistoryAfterLeave, [{_Time, leave, {"Peter", fell_asleep}} | _ ]).
 
 guess_updatesBoardOnCorrectGuessAndGivesPlayerAPoint_test() ->
 	InitialBoard = array:from_list(
