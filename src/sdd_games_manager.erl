@@ -91,4 +91,18 @@ join_joinsPlayerToGameAndIncreasesPlayerCountIfSuccessful_test() ->
 	?assert(meck:validate(sdd_game)),
 	meck:unload(sdd_game).
 
+join_failsIfGameIsFull_test() ->
+	?meck_sdd_game,
+	{GameId, InitialState} = create_game(#state{}),
+
+	{ok, StateAfterFirstJoin} = join("Peter", GameId, random, InitialState),
+	{ok, StateAfterSecondJoin} = join("Petra", GameId, random, StateAfterFirstJoin),
+	{ResultWhenFull, StateAfterThirdJoin} = join("Petrus", GameId, random, StateAfterSecondJoin),
+
+	?assertEqual(game_full, ResultWhenFull),
+	?assertEqual(2, gb_trees:get("GameA", StateAfterThirdJoin#state.games)),
+
+	?assert(meck:validate(sdd_game)),
+	meck:unload(sdd_game).
+
 -endif.
