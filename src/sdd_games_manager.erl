@@ -118,4 +118,17 @@ join_failsIfGameIsFull_test() ->
 	?assert(meck:validate(sdd_game)),
 	meck:unload(sdd_game).
 
+leave_removesPlayerFromGameAndDecreasesPlayerCount_test() ->
+	?meck_sdd_game,
+	{GameId, InitialState} = create_game(#state{}),
+	{ok, StateAfterJoin} = join("Peter", GameId, random, InitialState),
+
+	{noreply, StateAfterLeave} = handle_cast({leave, "Peter", GameId, fell_asleep}, StateAfterJoin),
+
+	?assert(meck:called(sdd_game, do, [GameId, "Peter", leave, fell_asleep])),
+	?assertEqual(0, gb_trees:get("GameA", StateAfterLeave#state.games)),
+
+	?assert(meck:validate(sdd_game)),
+	meck:unload(sdd_game).
+
 -endif.
