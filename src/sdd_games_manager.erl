@@ -13,6 +13,12 @@
 	games = gb_trees:empty()
 }).
 
+-ifdef(TEST).
+-define(MAX_PLAYERS_PER_GAME, 2).
+-else.
+-define(MAX_PLAYERS_PER_GAME, 5).
+-endif.
+
 %%% =================================================================================== %%%
 %%% GEN_SERVER CALLBACKS                                                                %%%
 %%% =================================================================================== %%%
@@ -31,13 +37,18 @@ create_game(State) ->
 	{GameId, State#state{games = NewGames}}.
 
 join(PlayerId, GameId, Source, State) ->
-	case sdd_game:do(GameId, PlayerId, join, Source) of
-		ok ->
-			OldPlayerCount = gb_trees:get(GameId, State#state.games),
-			NewGames = gb_trees:update(GameId, OldPlayerCount + 1, State#state.games),
-			{ok, State#state{games = NewGames}};
-		_Error ->
-			{_Error, State}
+	OldPlayerCount = gb_trees:get(GameId, State#state.games),
+	case OldPlayerCount < ?MAX_PLAYERS_PER_GAME of
+		true ->
+			case sdd_game:do(GameId, PlayerId, join, Source) of
+				ok ->
+					NewGames = gb_trees:update(GameId, OldPlayerCount + 1, State#state.games),
+					{ok, State#state{games = NewGames}};
+				_Error ->
+					{_Error, State}
+			end;
+		false ->
+			{game_full, State}
 	end.
 
 %%% =================================================================================== %%%
