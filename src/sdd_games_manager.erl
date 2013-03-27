@@ -10,7 +10,7 @@
 
 %% Types and Records
 -record(state, {
-	games = gb_tree:empty()
+	games = gb_trees:empty()
 }).
 
 %%% =================================================================================== %%%
@@ -25,6 +25,18 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+create_game_startsGameAndRegistersIt_test() ->
+	meck:new(sdd_game),
+	meck:sequence(sdd_game, start, 1, ["GameA", "GameB", "GameC"]),
 
+	InitialState = #state{},
+	{GameId, NewState} = create_game(InitialState),
+
+	?assert(meck:called(sdd_game, start, [no_options])),
+	?assert(meck:validate(sdd_game)),
+	meck:unload(sdd_game),
+
+	?assertEqual("GameA", GameId),
+	?assertEqual(0, gb_trees:get("GameA", NewState#state.games)).
 
 -endif.
