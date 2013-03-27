@@ -25,7 +25,7 @@
 %% Starts a new game and registers it
 
 create_game(State) ->
-	GameId = sdd_game:start(no_options),
+	GameId = sdd_game:start_link(no_options),
 	Games = State#state.games,
 	NewGames = gb_trees:insert(GameId, 0, Games),
 	{GameId, State#state{games = NewGames}}.
@@ -50,7 +50,7 @@ join(PlayerId, GameId, Source, State) ->
 
 -define(meck_sdd_game,
 	meck:new(sdd_game),
-	meck:sequence(sdd_game, start, 1, ["GameA", "GameB", "GameC"]),
+	meck:sequence(sdd_game, start_link, 1, ["GameA", "GameB", "GameC"]),
 	meck:expect(sdd_game, do, fun
 		(_GameId, "Paul", _Action, _Args) -> nope;
 		(_GameId, _PlayerId, _Action, _Args) -> ok
@@ -63,7 +63,7 @@ create_game_startsGameAndRegistersIt_test() ->
 	InitialState = #state{},
 	{GameId, NewState} = create_game(InitialState),
 
-	?assert(meck:called(sdd_game, start, [no_options])),
+	?assert(meck:called(sdd_game, start_link, [no_options])),
 	?assert(meck:validate(sdd_game)),
 	meck:unload(sdd_game),
 
