@@ -30,6 +30,16 @@ create_game(State) ->
 	NewGames = gb_trees:insert(GameId, 0, Games),
 	{GameId, State#state{games = NewGames}}.
 
+join(PlayerId, GameId, Source, State) ->
+	case sdd_game:do(GameId, PlayerId, join, Source) of
+		ok ->
+			OldPlayerCount = gb_trees:get(GameId, State#state.games),
+			NewGames = gb_trees:update(GameId, OldPlayerCount + 1, State#state.games),
+			{ok, State#state{games = NewGames}};
+		_Error ->
+			{_Error, State}
+	end.
+
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
 %%% =================================================================================== %%%
@@ -77,8 +87,6 @@ join_joinsPlayerToGameAndIncreasesPlayerCountIfSuccessful_test() ->
 
 	?assertEqual(ok, GoodResult),
 	?assertEqual(1, gb_trees:get("GameA", StateAfterGoodJoin#state.games)),
-
-	
 
 	?assert(meck:validate(sdd_game)),
 	meck:unload(sdd_game).
