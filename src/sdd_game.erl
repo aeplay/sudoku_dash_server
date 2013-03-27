@@ -179,7 +179,7 @@ join_createsJoinEvent_test() ->
 	meck:new(sdd_player),
 	meck:expect(sdd_player, handle_game_event, fun(_, _, _) -> continue_listening end),
 
-	{ok, HistoryAfterJoin} = handle_call({join, "Peter", random}, from, InitialHistory),
+	{reply, ok, HistoryAfterJoin} = handle_call({join, "Peter", random}, from, InitialHistory),
 	?history_assert_past_matches(HistoryAfterJoin, [{_Time, join, {"Peter", random}} | _]),
 
 	meck:unload(sdd_player).
@@ -190,11 +190,11 @@ join_failsIfGameIsFull_test() ->
 	meck:new(sdd_player),
 	meck:expect(sdd_player, handle_game_event, fun(_, _, _) -> continue_listening end),
 
-	{ok, HistoryAfterFirstJoin} = handle_call({join, "Peter", random}, from, InitialHistory),
+	{reply, ok, HistoryAfterFirstJoin} = handle_call({join, "Peter", random}, from, InitialHistory),
 
 	?history_assert_state_field_equals(HistoryAfterFirstJoin, n_players, 1),
 
-	{Response, HistoryAfterSecondJoin} = handle_call({join, "Paul", random}, from, HistoryAfterFirstJoin),
+	{reply, Response, HistoryAfterSecondJoin} = handle_call({join, "Paul", random}, from, HistoryAfterFirstJoin),
 
 	?assertEqual(game_full, Response),
 	?assertEqual(HistoryAfterFirstJoin, HistoryAfterSecondJoin),
@@ -205,9 +205,11 @@ join_addsPlayerListenerFunctionToHistory_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
 	InitialHistory = sdd_history:append(DummyHistory, start, ?example_board),
 	meck:new(sdd_player),
-	meck:expect(sdd_player, handle_game_event, fun("Peter", join, {"Peter", random}) -> continue_listening end),
+	meck:expect(sdd_player, handle_game_event, fun(_, _, _) -> continue_listening end),
 
-	{ok, _HistoryAfterJoin} = handle_call({join, "Peter", random}, from, InitialHistory),
+	{reply, ok, _HistoryAfterJoin} = handle_call({join, "Peter", random}, from, InitialHistory),
+	?assert(meck:called(sdd_player, handle_game_event, ["Peter", start, '_'])),
+	?assert(meck:called(sdd_player, handle_game_event, ["Peter", join, {"Peter", random}])),
 
 	?assert(meck:validate(sdd_player)),
 	meck:unload(sdd_player).
