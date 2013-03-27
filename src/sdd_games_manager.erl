@@ -10,7 +10,7 @@
 
 %% Types and Records
 -record(state, {
-	games = gb_trees:empty()
+	games = []
 }).
 
 -ifdef(TEST).
@@ -28,8 +28,8 @@
 
 handle_cast({leave, PlayerId, GameId, Reason}, State) ->
 	sdd_game:do(GameId, PlayerId, leave, Reason),
-	OldPlayerCount = gb_trees:get(GameId, State#state.games),
-	NewGames = gb_trees:update(GameId, OldPlayerCount - 1, State#state.games),
+	{GameId, OldPlayerCount} = lists:keyfind(GameId, 1, State#state.games),
+	NewGames = lists:keyreplace(GameId, 1, State#state.games, {GameId, OldPlayerCount - 1}),
 	{noreply, State#state{games = NewGames}}.
 
 %%% =================================================================================== %%%
@@ -42,16 +42,16 @@ handle_cast({leave, PlayerId, GameId, Reason}, State) ->
 create_game(State) ->
 	GameId = sdd_game:start_link(no_options),
 	Games = State#state.games,
-	NewGames = gb_trees:insert(GameId, 0, Games),
+	NewGames = [{GameId, 0}|Games],
 	{GameId, State#state{games = NewGames}}.
 
 join(PlayerId, GameId, Source, State) ->
-	OldPlayerCount = gb_trees:get(GameId, State#state.games),
+	{GameId, OldPlayerCount} = lists:keyfind(GameId, 1, State#state.games),
 	case OldPlayerCount < ?MAX_PLAYERS_PER_GAME of
 		true ->
 			case sdd_game:do(GameId, PlayerId, join, Source) of
 				ok ->
-					NewGames = gb_trees:update(GameId, OldPlayerCount + 1, State#state.games),
+					NewGames = lists:keyreplace(GameId, 1, State#state.games, {GameId, OldPlayerCount + 1}),
 					{ok, State#state{games = NewGames}};
 				_Error ->
 					{_Error, State}
@@ -88,7 +88,7 @@ create_game_startsGameAndRegistersIt_test() ->
 	meck:unload(sdd_game),
 
 	?assertEqual("GameA", GameId),
-	?assertEqual(0, gb_trees:get("GameA", NewState#state.games)).
+	?assertEqual({"GameA", 0}, lists:keyfind("GameA", 1, NewState#state.games)).
 
 join_joinsPlayerToGameAndIncreasesPlayerCountIfSuccessful_test() ->
 	?meck_sdd_game,
@@ -99,14 +99,14 @@ join_joinsPlayerToGameAndIncreasesPlayerCountIfSuccessful_test() ->
 	?assert(meck:called(sdd_game, do, [GameId, "Paul", join, random])),
 
 	?assertEqual(nope, BadResult),
-	?assertEqual(0, gb_trees:get("GameA", StateAfterBadJoin#state.games)),
+	?assertEqual({"GameA", 0}, lists:keyfind("GameA", 1, StateAfterBadJoin#state.games)),
 
 	{GoodResult, StateAfterGoodJoin} = join("Peter", GameId, random, InitialState),
 
 	?assert(meck:called(sdd_game, do, [GameId, "Peter", join, random])),
 
 	?assertEqual(ok, GoodResult),
-	?assertEqual(1, gb_trees:get("GameA", StateAfterGoodJoin#state.games)),
+	?assertEqual({"GameA", 1}, lists:keyfind("GameA", 1, StateAfterGoodJoin#state.games)),
 
 	?assert(meck:validate(sdd_game)),
 	meck:unload(sdd_game).
@@ -122,7 +122,7 @@ join_failsIfGameIsFull_test() ->
 	?assertNot(meck:called(sdd_game, do, [GameId, "Petrus", join, random])),
 
 	?assertEqual(game_full, ResultWhenFull),
-	?assertEqual(2, gb_trees:get("GameA", StateAfterThirdJoin#state.games)),
+	?assertEqual({"GameA", 2}, lists:keyfind("GameA", 1, StateAfterThirdJoin#state.games)),
 
 	?assert(meck:validate(sdd_game)),
 	meck:unload(sdd_game).
@@ -135,7 +135,7 @@ leave_removesPlayerFromGameAndDecreasesPlayerCount_test() ->
 	{noreply, StateAfterLeave} = handle_cast({leave, "Peter", GameId, fell_asleep}, StateAfterJoin),
 
 	?assert(meck:called(sdd_game, do, [GameId, "Peter", leave, fell_asleep])),
-	?assertEqual(0, gb_trees:get("GameA", StateAfterLeave#state.games)),
+	?assertEqual({"GameA", 0}, lists:keyfind("GameA", 1, StateAfterLeave#state.games)),
 
 	?assert(meck:validate(sdd_game)),
 	meck:unload(sdd_game).
