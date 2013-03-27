@@ -5,7 +5,7 @@
 -define(history_assert_state_field_equals(History, Field, ExpectedValue),
 	fun() ->
 		State = sdd_history:state(History),
-		?assertEqual(State#state.Field, ExpectedValue)
+		?assertEqual(ExpectedValue, State#state.Field)
 	end ()
 ).
 
