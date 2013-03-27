@@ -139,14 +139,18 @@ realize_event(State, guess, {PlayerId, Position, Number, {good}}) ->
 realize_event(State, join, _) ->
 	State#state{n_players = State#state.n_players + 1};
 
+%% Game becomes emptier
+
+realize_event(State, leave, _) ->
+	State#state{n_players = State#state.n_players - 1};
+
 %% Does not change state for guesses that are not good
 
 realize_event(State, guess, {_, _, _, _}) -> State;
 
 %% Does not change state for all other used events
 
-realize_event(State, chat, _) -> State;
-realize_event(State, leave, _) -> State.
+realize_event(State, chat, _) -> State.
 
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
@@ -237,7 +241,7 @@ leave_createsLeaveEventAndMakesGameEmptier_test() ->
 	{reply, ok, HistoryAfterJoin} = handle_call({join, "Peter", random}, from, InitialHistory),
 	{noreply, HistoryAfterLeave} = handle_cast({leave, "Peter", fell_asleep}, HistoryAfterJoin),
 	meck:unload(sdd_player),
-	
+
 	?history_assert_state_field_equals(HistoryAfterLeave, n_players, 0),
 	?history_assert_past_matches(HistoryAfterLeave, [{_Time, leave, {"Peter", fell_asleep}} | _ ]).
 
