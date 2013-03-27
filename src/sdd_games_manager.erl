@@ -110,6 +110,8 @@ join_failsIfGameIsFull_test() ->
 	{ok, StateAfterSecondJoin} = join("Petra", GameId, random, StateAfterFirstJoin),
 	{ResultWhenFull, StateAfterThirdJoin} = join("Petrus", GameId, random, StateAfterSecondJoin),
 
+	?assertNot(meck:called(sdd_game, do, [GameId, "Petrus", join, random])),
+
 	?assertEqual(game_full, ResultWhenFull),
 	?assertEqual(2, gb_trees:get("GameA", StateAfterThirdJoin#state.games)),
 
