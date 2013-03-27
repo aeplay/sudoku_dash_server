@@ -27,10 +27,8 @@
 
 -ifdef(TEST).
 -define(TIMEOUT_AFTER_COMPLETE, 10).
--define(MAX_PLAYERS, 1).
 -else.
 -define(TIMEOUT_AFTER_COMPLETE, 10000).
--define(MAX_PLAYERS, 6).
 -endif.
 
 
@@ -62,18 +60,12 @@ init(_Opts) ->
 %% Adds a player to the game (if it's not full), by creating an listener function
 
 handle_call({join, PlayerId, Source}, _From, History) ->
-	State = sdd_history:state(History),
-	case State#state.n_players < ?MAX_PLAYERS of
-		true ->
-			ListenerFunction = fun(event, {_Time, EventType, EventData}) ->
-				sdd_player:handle_game_event(PlayerId, EventType, EventData)
-			end,
-			HistoryWithNewListener = sdd_history:add_listener(History, ListenerFunction, replay_past),
-			NewHistory = sdd_history:append(HistoryWithNewListener, join, {PlayerId, Source}),
-			{reply, ok, NewHistory};
-		false ->
-			{reply, game_full, History}
-	end.
+	ListenerFunction = fun(event, {_Time, EventType, EventData}) ->
+		sdd_player:handle_game_event(PlayerId, EventType, EventData)
+	end,
+	HistoryWithNewListener = sdd_history:add_listener(History, ListenerFunction, replay_past),
+	NewHistory = sdd_history:append(HistoryWithNewListener, join, {PlayerId, Source}),
+	{reply, ok, NewHistory}.
 
 %% ------------------------------------------------------------------------------------- %%
 %% Adds a chat message to the history
@@ -134,23 +126,15 @@ realize_event(State, guess, {PlayerId, Position, Number, {good}}) ->
 	Complete = sdd_logic:is_complete(NewBoard),
 	State#state{board = NewBoard, candidates = NewCandidates, complete = Complete};
 
-%% Game becomes fuller
-
-realize_event(State, join, _) ->
-	State#state{n_players = State#state.n_players + 1};
-
-%% Game becomes emptier
-
-realize_event(State, leave, _) ->
-	State#state{n_players = State#state.n_players - 1};
-
 %% Does not change state for guesses that are not good
 
 realize_event(State, guess, {_, _, _, _}) -> State;
 
 %% Does not change state for all other used events
 
-realize_event(State, chat, _) -> State.
+realize_event(State, chat, _) -> State;
+realize_event(State, join, _) -> State;
+realize_event(State, leave, _) -> State.
 
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
@@ -201,23 +185,6 @@ join_createsJoinEvent_test() ->
 
 	meck:unload(sdd_player).
 
-join_failsIfGameIsFull_test() ->
-	DummyHistory = sdd_history:new(fun realize_event/3),
-	InitialHistory = sdd_history:append(DummyHistory, start, ?example_board),
-	meck:new(sdd_player),
-	meck:expect(sdd_player, handle_game_event, fun(_, _, _) -> continue_listening end),
-
-	{reply, ok, HistoryAfterFirstJoin} = handle_call({join, "Peter", random}, from, InitialHistory),
-
-	?history_assert_state_field_equals(HistoryAfterFirstJoin, n_players, 1),
-
-	{reply, Response, HistoryAfterSecondJoin} = handle_call({join, "Paul", random}, from, HistoryAfterFirstJoin),
-
-	?assertEqual(game_full, Response),
-	?assertEqual(HistoryAfterFirstJoin, HistoryAfterSecondJoin),
-
-	meck:unload(sdd_player).
-
 join_addsPlayerListenerFunctionToHistory_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
 	InitialHistory = sdd_history:append(DummyHistory, start, ?example_board),
@@ -231,7 +198,7 @@ join_addsPlayerListenerFunctionToHistory_test() ->
 	?assert(meck:validate(sdd_player)),
 	meck:unload(sdd_player).
 
-leave_createsLeaveEventAndMakesGameEmptier_test() ->
+leave_createsLeaveEvent_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
 	InitialHistory = sdd_history:append(DummyHistory, start, ?example_board),
 
@@ -242,7 +209,6 @@ leave_createsLeaveEventAndMakesGameEmptier_test() ->
 	{noreply, HistoryAfterLeave} = handle_cast({leave, "Peter", fell_asleep}, HistoryAfterJoin),
 	meck:unload(sdd_player),
 
-	?history_assert_state_field_equals(HistoryAfterLeave, n_players, 0),
 	?history_assert_past_matches(HistoryAfterLeave, [{_Time, leave, {"Peter", fell_asleep}} | _ ]).
 
 guess_updatesBoardOnCorrectGuessAndGivesPlayerAPoint_test() ->
