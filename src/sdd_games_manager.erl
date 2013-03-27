@@ -23,6 +23,15 @@
 %%% GEN_SERVER CALLBACKS                                                                %%%
 %%% =================================================================================== %%%
 
+%% ------------------------------------------------------------------------------------- %%
+%% Removes a player from a game and decreases the according player counter
+
+handle_cast({leave, PlayerId, GameId, Reason}, State) ->
+	sdd_game:do(GameId, PlayerId, leave, Reason),
+	OldPlayerCount = gb_trees:get(GameId, State#state.games),
+	NewGames = gb_trees:update(GameId, OldPlayerCount - 1, State#state.games),
+	{noreply, State#state{games = NewGames}}.
+
 %%% =================================================================================== %%%
 %%% UTILITY FUNCTIONS                                                                   %%%
 %%% =================================================================================== %%%
