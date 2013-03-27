@@ -188,12 +188,12 @@ join_notifiesGameWeWantToJoinAndSavesGameAsCurrentGameIfSuccessful_test() ->
 
 	{ok, InitialHistory} = ?init_peter,
 
-	{noreply, HistoryAfterBadJoin} = handle_cast({join, {"BadGame", random}}, InitialHistory),
+	{reply, nope, HistoryAfterBadJoin} = handle_call({join, {"BadGame", random}}, from, InitialHistory),
 	?assertEqual(HistoryAfterBadJoin, InitialHistory),
 
 	?assert(meck:called(sdd_game, join, ["Peter", "BadGame", random])),
 
-	{noreply, HistoryAfterGoodJoin} = handle_cast({join, {"GoodGame", invite}}, InitialHistory),
+	{reply, ok, HistoryAfterGoodJoin} = handle_call({join, {"GoodGame", invite}}, from, InitialHistory),
 
 	?assert(meck:called(sdd_game, join, ["Peter", "GoodGame", invite])),
 	?assert(meck:validate(sdd_game)),
@@ -205,13 +205,13 @@ join_notifiesGameWeWantToJoinAndSavesGameAsCurrentGameIfSuccessful_test() ->
 -define(init_peter_and_join_good_game,
 	fun () ->
 		{ok, InitialHistory} = ?init_peter,
-		handle_cast({join, {"GoodGame", invite}}, InitialHistory)
+		handle_call({join, {"GoodGame", invite}}, from, InitialHistory)
 	end ()
 ).
 
 leave_resetsCurrentGame_test() ->
 	?meck_sdd_game_join,
-	{noreply, HistoryAfterGoodJoin} = ?init_peter_and_join_good_game,
+	{reply, ok, HistoryAfterGoodJoin} = ?init_peter_and_join_good_game,
 
 	meck:expect(sdd_game, leave, fun
 		("Peter", "GoodGame", timeout) -> ok
@@ -227,7 +227,7 @@ leave_resetsCurrentGame_test() ->
 
 leave_notifiesGameThatWeLeft_test() ->	
 	?meck_sdd_game_join,
-	{noreply, HistoryAfterGoodJoin} = ?init_peter_and_join_good_game,
+	{reply, ok, HistoryAfterGoodJoin} = ?init_peter_and_join_good_game,
 
 	meck:expect(sdd_game, leave, fun
 		("Peter", "GoodGame", timeout) -> ok
@@ -241,7 +241,7 @@ leave_notifiesGameThatWeLeft_test() ->
 
 handle_game_event_continuesListeningOnlyIfEventWasFromCurrentGame_test() ->
 	?meck_sdd_game_join,
-	{noreply, HistoryAfterGoodJoin} = ?init_peter_and_join_good_game,
+	{reply, ok, HistoryAfterGoodJoin} = ?init_peter_and_join_good_game,
 
 	meck:unload(sdd_game),
 
@@ -272,7 +272,7 @@ handle_game_event_continuesListeningOnlyIfEventWasFromCurrentGame_test() ->
 
 handle_game_event_redirectsToCurrentClientIfExistsAndIfEventWasFromCurrentGame_test() ->
 	?meck_sdd_game_join,
-	{noreply, HistoryAfterGoodJoin} = ?init_peter_and_join_good_game,
+	{reply, ok, HistoryAfterGoodJoin} = ?init_peter_and_join_good_game,
 
 	meck:unload(sdd_game),
 
