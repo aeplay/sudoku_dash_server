@@ -18,7 +18,8 @@
 -record(state, {
 	board,
 	candidates,
-	complete = false
+	complete = false,
+	n_players = 0
 }).
 
 %% Config
@@ -26,8 +27,10 @@
 
 -ifdef(TEST).
 -define(TIMEOUT_AFTER_COMPLETE, 10).
+-define(MAX_PLAYERS, 1).
 -else.
 -define(TIMEOUT_AFTER_COMPLETE, 10000).
+-define(MAX_PLAYERS, 6).
 -endif.
 
 
@@ -56,15 +59,21 @@ init(_Opts) ->
 	{ok, InitialHistory}.
 
 %% ------------------------------------------------------------------------------------- %%
-%% Adds a player to the game, by creating an appropriate listener function
+%% Adds a player to the game (if it's not full), by creating an listener function
 
 handle_call({join, PlayerId, Source}, _From, History) ->
-	ListenerFunction = fun(event, {_Time, EventType, EventData}) ->
-		sdd_player:handle_game_event(PlayerId, EventType, EventData)
-	end,
-	HistoryWithNewListener = sdd_history:add_listener(History, ListenerFunction, replay_past),
-	NewHistory = sdd_history:append(HistoryWithNewListener, join, {PlayerId, Source}),
-	{ok, NewHistory}.
+	State = sdd_history:state(History),
+	case State#state.n_players < ?MAX_PLAYERS of
+		true ->
+			ListenerFunction = fun(event, {_Time, EventType, EventData}) ->
+				sdd_player:handle_game_event(PlayerId, EventType, EventData)
+			end,
+			HistoryWithNewListener = sdd_history:add_listener(History, ListenerFunction, replay_past),
+			NewHistory = sdd_history:append(HistoryWithNewListener, join, {PlayerId, Source}),
+			{reply, ok, NewHistory};
+		false ->
+			{reply, game_full, History}
+	end.
 
 %% ------------------------------------------------------------------------------------- %%
 %% Adds a chat message to the history
@@ -125,6 +134,11 @@ realize_event(State, guess, {PlayerId, Position, Number, {good}}) ->
 	Complete = sdd_logic:is_complete(NewBoard),
 	State#state{board = NewBoard, candidates = NewCandidates, complete = Complete};
 
+%% Game becomes fuller
+
+realize_event(State, join, _) ->
+	State#state{n_players = State#state.n_players + 1};
+
 %% Does not change state for guesses that are not good
 
 realize_event(State, guess, {_, _, _, _}) -> State;
@@ -132,7 +146,6 @@ realize_event(State, guess, {_, _, _, _}) -> State;
 %% Does not change state for all other used events
 
 realize_event(State, chat, _) -> State;
-realize_event(State, join, _) -> State;
 realize_event(State, leave, _) -> State.
 
 %%% =================================================================================== %%%
