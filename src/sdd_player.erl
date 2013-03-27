@@ -56,18 +56,6 @@ init(PlayerInfo) ->
 	{ok, InitialHistory}.
 
 %% ------------------------------------------------------------------------------------- %%
-%% Tries to join a game, coming from a source
-
-handle_cast({join, {GameId, Source}}, History) ->
-	State = sdd_history:state(History),
-	case sdd_game:join(State#state.name, GameId, Source) of
-		ok ->
-			NewHistory = sdd_history:append(History, join, {GameId, Source}),
-			{noreply, NewHistory};
-		_Error ->
-			{noreply, History}
-	end;
-
 %% Leaves the current game, for a reason, and notifies the game
 
 handle_cast({leave, Reason}, History) ->
@@ -90,6 +78,18 @@ handle_cast({get_badge, Badge}, History) ->
 	{noreply, NewHistory}.
 
 %% ------------------------------------------------------------------------------------- %%
+%% Tries to join a game, coming from a source
+
+handle_call({join, {GameId, Source}}, _From, History) ->
+	State = sdd_history:state(History),
+	case sdd_game:join(State#state.name, GameId, Source) of
+		ok ->
+			NewHistory = sdd_history:append(History, join, {GameId, Source}),
+			{reply, ok, NewHistory};
+		Error ->
+			{reply, Error, History}
+	end;
+
 %% Returns continue_listening for events from our current game
 %% and redirects them to the client
 
