@@ -21,9 +21,9 @@
 %%% CALLBACKS                                                                           %%%
 %%% =================================================================================== %%%
 
-init(_Transport, Req, _Opts, _Active) ->
+init(_Transport, Req, _Opts, Active) ->
 	io:format("bullet init~n"),
-	{ok, Req, undefined}.
+	{ok, Req, #state{active = Active}}.
 
 stream(Data, Req, State) ->
 	io:format("stream received ~s~n", [Data]),
@@ -45,8 +45,9 @@ terminate(_Req, _State) ->
 %% ------------------------------------------------------------------------------------- %%
 %% Find or create the client process with the given id, connect to it and return its pid
 
-handle_json([<<"hello">>, ClientId], undefined) ->
-	sdd_client:add_connection(ClientId, self()).
+handle_json([<<"hello">>, ClientId], State) ->
+	ClientPid = sdd_client:add_connection(ClientId, self(), State#state.active),
+	State#state{client_pid = ClientPid}.
 
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
