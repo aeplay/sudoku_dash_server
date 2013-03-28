@@ -74,20 +74,37 @@ add_message(Message, State) ->
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("sdd_history_test_macros.hrl").
 
-init_createsNewClientForPlayerAndConnectsToHim_test() ->
+init_savesClientIdAndInfo_test() ->
+	{ok, InitialState} = init({"ClientId", "ClientInfo"}),
+	?assertEqual("ClientId", InitialState#state.id),
+	?assertEqual("ClientInfo", InitialState#state.info).
+
+login_authenticatesWithPlayerAndConnectsIfSuccessful_test() ->	
 	meck:new(sdd_player),
+	meck:expect(sdd_player, authenticate, fun
+		("Peter", "GoodSecret") -> true;
+		("Peter", "BadSecret") -> false
+	end),
 	meck:expect(sdd_player, connect, fun
 		(_PlayerId, _ClientId, _ClientInfo) -> ok
 	end),
 
-	{ok, InitialState} = init({"ClientId", "ClientInfo", "Peter"}),
+	InitialState = #state{id = "ClientId", info = "ClientInfo", player = undefined},
 
+	{reply, authentication_failed, StateAfterBadLogin} = handle_call({login, "Peter", "BadSecret"}, from, InitialState),
+
+	?assert(meck:called(sdd_player, authenticate, ["Peter", "BadSecret"])),
+	?assertNot(meck:called(sdd_player, connect, ["Peter", "ClientId", "ClientInfo"])),
+	?assertEqual(StateAfterBadLogin#state.player, undefined),
+
+	{reply, ok, StateAfterGoodLogin} = handle_call({login, "Peter", "GoodSecret"}, from, InitialState),
+
+	?assert(meck:called(sdd_player, authenticate, ["Peter", "GoodSecret"])),
 	?assert(meck:called(sdd_player, connect, ["Peter", "ClientId", "ClientInfo"])),
-	?assert(meck:validate(sdd_player)),
-	meck:unload(sdd_player),
+	?assertEqual(StateAfterGoodLogin#state.player, "Peter"),
 
-	?assertEqual(InitialState#state.id, "ClientId"),
-	?assertEqual(InitialState#state.player, "Peter").
+	?assert(meck:validate(sdd_player)),
+	meck:unload(sdd_player).
 
 add_connection_setsNewConnectionSavesItsActiveStateAndRepliesWithHello_test() ->
 	{noreply, State} = handle_cast({add_connection, self(), true}, #state{}),
