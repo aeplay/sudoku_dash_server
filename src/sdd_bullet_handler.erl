@@ -24,7 +24,7 @@ init(_Transport, Req, _Opts, _Active) ->
 stream(Data, Req, State) ->
 	io:format("stream received ~s~n", [Data]),
 	NewState = handle_json(sdd_json:decode(Data), State),
-	{ok, Req, State}.
+	{ok, Req, NewState}.
 
 info(Info, Req, State) ->
 	io:format("info received ~p~n", [Info]),
@@ -52,7 +52,7 @@ handle_json([<<"hello">>, ClientId], undefined) ->
 
 -include_lib("eunit/include/eunit.hrl").
 
-handle_json_hello_repliesWithHelloAndAddsConnectionToClient_test() ->
+handle_json_hello_addsConnectionToClient_test() ->
 	meck:new(sdd_client),
 	meck:expect(sdd_client, add_connection, fun
 		(<<"ClientA">>, _ConnectionId) -> "ClientAPid"
