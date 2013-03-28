@@ -40,7 +40,7 @@ handle_game_event(PlayerId, GameId, EventType, EventData) ->
 	end.
 
 connect(PlayerId, ClientId, ClientInfo) ->	
-	gen_server:call(PlayerId, {connect, ClientId, ClientInfo}).
+	gen_server:cast(PlayerId, {connect, ClientId, ClientInfo}).
 
 %%% =================================================================================== %%%
 %%% GEN_SERVER CALLBACKS                                                                %%%
@@ -56,6 +56,17 @@ init(PlayerInfo) ->
 	{ok, InitialHistory}.
 
 %% ------------------------------------------------------------------------------------- %%
+%% Connects a new client
+
+handle_cast({connect, ClientId, ClientInfo}, History) ->
+	ListenerFunction = fun
+		(state, PlayerState) -> sdd_client:sync_player_state(ClientId, sdd_client:extract_interesting_state(PlayerState));
+		(event, {_Time, EventType, EventData}) -> sdd_client:handle_player_event(ClientId, EventType, EventData)
+	end,
+	HistoryWithListener = sdd_history:add_listener(History, ListenerFunction, tell_state),
+	NewHistory = sdd_history:append(HistoryWithListener, connect, {ClientId, ClientInfo}),
+	{noreply, NewHistory};
+
 %% Leaves the current game, for a reason, and notifies the game
 
 handle_cast({leave, Reason}, History) ->
@@ -70,7 +81,6 @@ handle_cast({get_points, Increase}, History) ->
 	NewHistory = sdd_history:append(History, get_points, Increase),
 	{noreply, NewHistory};
 
-%% ------------------------------------------------------------------------------------- %%
 %% Adds a badge
 
 handle_cast({get_badge, Badge}, History) ->
@@ -105,19 +115,7 @@ handle_call({game_event, GameId, EventType, EventData}, _From, History) ->
 			{continue_listening, History};
 		_WrongGame ->
 			{wrong_game, History}
-	end;
-
-%% ------------------------------------------------------------------------------------- %%
-%% Connects a new client
-
-handle_call({connect, ClientId, ClientInfo}, _From, History) ->
-	ListenerFunction = fun
-		(state, PlayerState) -> sdd_client:sync_player_state(ClientId, sdd_client:extract_interesting_state(PlayerState));
-		(event, {_Time, EventType, EventData}) -> sdd_client:handle_player_event(ClientId, EventType, EventData)
-	end,
-	HistoryWithListener = sdd_history:add_listener(History, ListenerFunction, tell_state),
-	NewHistory = sdd_history:append(HistoryWithListener, connect, {ClientId, ClientInfo}),
-	{ok, NewHistory}.
+	end.
 
 %%% =================================================================================== %%%
 %%% HISTORY CALLBACKS                                                                   %%%
@@ -284,7 +282,7 @@ handle_game_event_redirectsToCurrentClientIfExistsAndIfEventWasFromCurrentGame_t
 
 	?meck_sdd_client,
 
-	{ok, HistoryAfterConnect} = handle_call({connect, "ClientA", "ClientAInfo"}, from, HistoryAfterGoodJoin),
+	{noreply, HistoryAfterConnect} = handle_cast({connect, "ClientA", "ClientAInfo"}, HistoryAfterGoodJoin),
 	handle_call({game_event, "GoodGame", some_event, some_data}, from, HistoryAfterConnect),
 	?assert(meck:called(sdd_client, handle_game_event, ["ClientA", "GoodGame", some_event, some_data])),
 	?assert(meck:validate(sdd_client)),
@@ -318,7 +316,7 @@ connect_setsNewClientAndMakesClientAListenerOfPlayerHistory_test() ->
 	% make sure client gets player state without secret field
 	StateBeforeConnect = sdd_history:state(InitialHistory),
 
-	{ok, HistoryAfterConnect} = handle_call({connect, "ClientA", "ClientAInfo"}, from, InitialHistory),
+	{noreply, HistoryAfterConnect} = handle_cast({connect, "ClientA", "ClientAInfo"}, InitialHistory),
 
 	?assert(meck:called(sdd_client, sync_player_state, ["ClientA", sdd_client:extract_interesting_state(StateBeforeConnect)])),
 
