@@ -13,6 +13,7 @@
 %% Records
 -record(state, {
 	id,
+	info,
 	connection,
 	connection_active,
 	connection_can_send,
@@ -28,13 +29,23 @@
 %% ------------------------------------------------------------------------------------- %%
 %% Creates a new client with client info and connects to the given player
 
-init({ClientId, ClientInfo, PlayerId}) ->
+init({ClientId, ClientInfo}) ->
 	InitialState = #state{
 		id = ClientId,
-		player = PlayerId
+		info = ClientInfo
 	},
-	sdd_player:connect(PlayerId, ClientId, ClientInfo),
 	{ok, InitialState}.
+
+%% ------------------------------------------------------------------------------------- %%
+%% Tries to authenticate with a secret and connect to the given player
+
+handle_call({login, PlayerId, Secret}, _From, State) ->
+	case sdd_player:authenticate(PlayerId, Secret) of
+		true -> 
+			sdd_player:connect(PlayerId, State#state.id, State#state.info),
+			{reply, ok, State#state{player = PlayerId}};
+		false -> {reply, authentication_failed, State}
+	end.
 
 %% ------------------------------------------------------------------------------------- %%
 %% Adds a new connection, remembers its active state and resets whether we can send
