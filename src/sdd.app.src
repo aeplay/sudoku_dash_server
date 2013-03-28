@@ -1,8 +1,12 @@
 {application, sdd, [
-	{description, ""},
-	{vsn, "1"},
+	{description, "sudoku dash"},
+	{vsn, "Alpha 1"},
 	{registered, []},
-	{applications, [kernel,stdlib]},
+	{applications, [
+		kernel,
+		stdlib,
+		cowboy
+	]},
 	{mod, { sdd_app, []}},
 	{env, []}
 ]}.
