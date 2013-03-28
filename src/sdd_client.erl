@@ -134,7 +134,7 @@ add_message_failsIfNoConnection_test() ->
 	?assertEqual(#state{}, add_message(message, #state{})).
 
 add_message_failsIfCantSendAnymore_test() ->
-	State = #state{connection_can_send = false},
+	State = #state{connection = "SomeConnection", connection_can_send = false},
 	?assertEqual(State, add_message(message, State)).
 
 add_message_canSendOneBatchOfMessagesIfCanSendButNotActive_test() ->
