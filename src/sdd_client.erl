@@ -70,11 +70,11 @@ handle_cast({player_do, Action, Args}, State) ->
 %%% =================================================================================== %%%
 
 add_message(Message, State) ->
+	Messages = [Message | State#state.messages],
 	case {State#state.connection, State#state.connection_can_send} of
-		{undefined, _} -> State;
-		{_Connection, false} -> State;
+		{undefined, _} -> State#state{messages = Messages};
+		{_Connection, false} -> State#state{messages = Messages};
 		{Connection, true} ->
-			Messages = [Message | State#state.messages],
 			Connection ! {messages, Messages},
 			case State#state.connection_active of
 				true -> State#state{messages = []};
