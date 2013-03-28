@@ -45,8 +45,8 @@ handle_cast({add_connection, ConnectionPid, ConnectionActive}, State) ->
 		connection_active = ConnectionActive,
 		connection_can_send = true
 	},
-	ConnectionPid ! send_hello,
-	{noreply, NewState}.
+	StateAfterHelloSent = add_message(hello, NewState),
+	{noreply, StateAfterHelloSent}.
 
 %%% =================================================================================== %%%
 %%% UTILITY FUNCTION                                                                    %%%
@@ -97,7 +97,7 @@ add_connection_setsNewConnectionSavesItsActiveStateAndRepliesWithHello_test() ->
 	?assertEqual(true, State#state.connection_can_send),
 
 	receive
-		send_hello -> ?assert(true)
+		{messages, [hello]} -> ?assert(true)
 	after
 		100 -> ?assert(false)
 	end.
