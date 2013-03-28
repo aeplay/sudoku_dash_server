@@ -16,7 +16,7 @@
 	connection,
 	connection_active,
 	connection_can_send,
-	messages_for_client = [],
+	messages = [],
 	player,
 	current_game
 }).
@@ -51,6 +51,19 @@ handle_cast({add_connection, ConnectionPid, ConnectionActive}, State) ->
 %%% =================================================================================== %%%
 %%% UTILITY FUNCTION                                                                    %%%
 %%% =================================================================================== %%%
+
+add_message(Message, State) ->
+	case {State#state.connection, State#state.connection_can_send} of
+		{undefined, _} -> State;
+		{_Connection, false} -> State;
+		{Connection, true} ->
+			Messages = [Message | State#state.messages],
+			Connection ! {messages, Messages},
+			case State#state.connection_active of
+				true -> State#state{messages = []};
+				false -> State#state{messages = [], connection_can_send = false}
+			end
+	end.
 
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
