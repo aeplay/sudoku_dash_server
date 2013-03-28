@@ -155,11 +155,20 @@ player_do_forwardsActionToPlayer_test() ->
 	meck:unload(sdd_player).
 
 add_message_failsIfNoConnection_test() ->
-	?assertEqual(#state{}, add_message(message, #state{})).
+	State = #state{
+		messages = [message_a]
+	},
+	StateAfterAdd = add_message(message_b, State),
+	?assertEqual([message_b, message_a], StateAfterAdd#state.messages).
 
 add_message_failsIfCantSendAnymore_test() ->
-	State = #state{connection = "SomeConnection", connection_can_send = false},
-	?assertEqual(State, add_message(message, State)).
+	State = #state{
+		connection = "SomeConnection",
+		connection_can_send = false,
+		messages = [message_a]
+	},
+	StateAfterAdd = add_message(message_b, State),
+	?assertEqual([message_b, message_a], StateAfterAdd#state.messages).
 
 add_message_canSendOneBatchOfMessagesIfCanSendButNotActive_test() ->
 	State = #state{
