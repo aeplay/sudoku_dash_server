@@ -11,7 +11,11 @@
 %% Callbacks
 -export([init/4, stream/3, info/3, terminate/2]).
 
--define(PERIOD, 1000).
+%% Records
+-record(state, {
+	client_pid,
+	active
+}).
 
 %%% =================================================================================== %%%
 %%% CALLBACKS                                                                           %%%
@@ -55,13 +59,13 @@ handle_json([<<"hello">>, ClientId], undefined) ->
 handle_json_hello_addsConnectionToClient_test() ->
 	meck:new(sdd_client),
 	meck:expect(sdd_client, add_connection, fun
-		(<<"ClientA">>, _ConnectionId) -> "ClientAPid"
+		(<<"ClientA">>, _ConnectionId, _ConnectionActive) -> "ClientAPid"
 	end),
 
-	ClientPid = handle_json([<<"hello">>, <<"ClientA">>], undefined),
+	State = handle_json([<<"hello">>, <<"ClientA">>], #state{active = true}),
 
-	?assert(meck:called(sdd_client, add_connection, [<<"ClientA">>, self()])),
-	?assertEqual(ClientPid, "ClientAPid"),
+	?assert(meck:called(sdd_client, add_connection, [<<"ClientA">>, self(), true])),
+	?assertEqual(State#state.client_pid, "ClientAPid"),
 
 	?assert(meck:validate(sdd_client)),
 	meck:unload(sdd_client).
