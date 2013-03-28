@@ -28,10 +28,8 @@
 %% Creates a new client with the given initial connection, and client info
 %% Connects to the given player
 
-init({Connection, ConnectionActive, ClientId, ClientInfo, PlayerId}) ->
+init({ClientId, ClientInfo, PlayerId}) ->
 	InitialState = #state{
-		current_connection = Connection,
-		current_connection_active = ConnectionActive,
 		id = ClientId,
 		player = PlayerId
 	},
@@ -53,15 +51,27 @@ init_createsNewClientForPlayerAndConnectsToHim_test() ->
 		(_PlayerId, _ClientId, _ClientInfo) -> ok
 	end),
 
-	{ok, InitialState} = init({"ConnectionA", true, "ClientId", "ClientInfo", "Peter"}),
+	{ok, InitialState} = init({"ClientId", "ClientInfo", "Peter"}),
 
 	?assert(meck:called(sdd_player, connect, ["Peter", "ClientId", "ClientInfo"])),
 	?assert(meck:validate(sdd_player)),
 	meck:unload(sdd_player),
 
 	?assertEqual(InitialState#state.id, "ClientId"),
-	?assertEqual(InitialState#state.current_connection, "ConnectionA"),
-	?assertEqual(InitialState#state.current_connection_active, true),
 	?assertEqual(InitialState#state.player, "Peter").
+
+add_connection_setsNewConnectionSavesItsActiveStateAndRepliesWithHello_test() ->
+	{noreply, State} = handle_cast({add_connection, self(), true}, #state{}),
+
+	?assertEqual(self(), State#state.connection),
+	?assertEqual(true, State#state.connection_active),
+	?assertEqual(true, State#state.connection_can_send),
+
+	receive
+		send_hello -> ?assert(true)
+	after
+		100 -> ?assert(false)
+	end.
+
 
 -endif.
