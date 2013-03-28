@@ -23,7 +23,7 @@ init(_Transport, Req, _Opts, _Active) ->
 
 stream(Data, Req, State) ->
 	io:format("stream received ~s~n", [Data]),
-	handle_json(sdd_json:decode(Data), Req, State),
+	NewState = handle_json(sdd_json:decode(Data), State),
 	{ok, Req, State}.
 
 info(Info, Req, State) ->
@@ -52,7 +52,7 @@ handle_json_hello_repliesWithHelloAndAddsConnectionToClient_test() ->
 		(<<"ClientA">>, _ConnectionId) -> "ClientAPid"
 	end),
 
-	ClientPid = handle_json([<<"hello">>, <<"ClientA">>]),
+	ClientPid = handle_json([<<"hello">>, <<"ClientA">>], undefined),
 
 	?assert(meck:called(sdd_client, add_connection, [<<"ClientA">>, self()])),
 	?assertEqual(ClientPid, "ClientAPid"),
