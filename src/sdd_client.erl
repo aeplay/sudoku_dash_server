@@ -13,8 +13,9 @@
 %% Records
 -record(state, {
 	id,
-	current_connection,
-	current_connection_active,
+	connection,
+	connection_active,
+	connection_can_send,
 	messages_for_client = [],
 	player,
 	current_game
@@ -25,8 +26,7 @@
 %%% =================================================================================== %%%
 
 %% ------------------------------------------------------------------------------------- %%
-%% Creates a new client with the given initial connection, and client info
-%% Connects to the given player
+%% Creates a new client with client info and connects to the given player
 
 init({ClientId, ClientInfo, PlayerId}) ->
 	InitialState = #state{
@@ -35,6 +35,18 @@ init({ClientId, ClientInfo, PlayerId}) ->
 	},
 	sdd_player:connect(PlayerId, ClientId, ClientInfo),
 	{ok, InitialState}.
+
+%% ------------------------------------------------------------------------------------- %%
+%% Adds a new connection, remembers its active state and resets whether we can send
+
+handle_cast({add_connection, ConnectionPid, ConnectionActive}, State) ->
+	NewState = State#state{
+		connection = ConnectionPid,
+		connection_active = ConnectionActive,
+		connection_can_send = true
+	},
+	ConnectionPid ! send_hello,
+	{noreply, NewState}.
 
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
