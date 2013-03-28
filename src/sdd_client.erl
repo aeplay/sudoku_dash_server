@@ -49,6 +49,10 @@ handle_cast({add_connection, ConnectionPid, ConnectionActive}, State) ->
 	{noreply, NewState}.
 
 %%% =================================================================================== %%%
+%%% UTILITY FUNCTION                                                                    %%%
+%%% =================================================================================== %%%
+
+%%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
 %%% =================================================================================== %%%
 
@@ -85,5 +89,47 @@ add_connection_setsNewConnectionSavesItsActiveStateAndRepliesWithHello_test() ->
 		100 -> ?assert(false)
 	end.
 
+add_message_failsIfNoConnection_test() ->
+	?assertEqual(#state{}, add_message(message, #state{})).
+
+add_message_failsIfCantSendAnymore_test() ->
+	State = #state{connection_can_send = false},
+	?assertEqual(State, add_message(message, State)).
+
+add_message_canSendOneBatchOfMessagesIfCanSendButNotActive_test() ->
+	State = #state{
+		connection = self(),
+		connection_active = false,
+		connection_can_send = true,
+		messages = [message_a]
+	},
+	StateAfterAddMessage = add_message(message_b, State),
+
+	?assertEqual(false, StateAfterAddMessage#state.connection_can_send),
+	?assertEqual([], StateAfterAddMessage#state.messages),
+
+	receive
+		{messages, [message_b, message_a]} -> ?assert(true)
+	after
+		100 -> ?assert(false)
+	end.
+
+add_message_canAlwaysSendIfConnectionActive_test() ->
+	State = #state{
+		connection = self(),
+		connection_active = true,
+		connection_can_send = true,
+		messages = [message_a]
+	},
+	StateAfterAddMessage = add_message(message_b, State),
+
+	?assertEqual(true, StateAfterAddMessage#state.connection_can_send),
+	?assertEqual([], StateAfterAddMessage#state.messages),
+
+	receive
+		{messages, [message_b, message_a]} -> ?assert(true)
+	after
+		100 -> ?assert(false)
+	end.
 
 -endif.
