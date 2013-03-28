@@ -57,7 +57,13 @@ handle_cast({add_connection, ConnectionPid, ConnectionActive}, State) ->
 		connection_can_send = true
 	},
 	StateAfterHelloSent = add_message(hello, NewState),
-	{noreply, StateAfterHelloSent}.
+	{noreply, StateAfterHelloSent};
+
+%% Makes the player do something on behalf of the client
+
+handle_cast({player_do, Action, Args}, State) ->
+	sdd_player:do(State#state.player, Action, Args),
+	{noreply, State}.
 
 %%% =================================================================================== %%%
 %%% UTILITY FUNCTION                                                                    %%%
