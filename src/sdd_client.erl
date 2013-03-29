@@ -30,11 +30,11 @@
 %%% =================================================================================== %%%
 
 add_connection(ClientId, ConnectionPid, ConnectionActive) ->
-	ClientPid = case erlang:is_process_alive({global, {client, ClientId}}) of
-		true -> {global, {client, ClientId}};
-		false -> sdd_clients_sup:start_client(ClientId)
+	ClientPid = case global:whereis_name({client, ClientId}) of
+		undefined -> sdd_clients_sup:start_client(ClientId);
+		Pid -> Pid
 	end,
-	gen_server:cast(ClientId, {add_connection, ConnectionPid, ConnectionActive}).
+	gen_server:cast(ClientPid, {add_connection, ConnectionPid, ConnectionActive}).
 
 %%% =================================================================================== %%%
 %%% GEN_SERVER CALLBACKS                                                                %%%
