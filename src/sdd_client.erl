@@ -80,6 +80,16 @@ handle_cast({player_do, Action, Args}, State) ->
 	sdd_player:do(State#state.player, Action, Args),
 	{noreply, State};
 
+%% Makes the player do something in a game in behalf of the client
+
+handle_cast({game_do, Action, Args}, State) ->
+	case {State#state.player, State#state.current_game} of
+		{undefined, _} -> do_nothing;
+		{_, undefined} -> do_nothing;
+		{PlayerId, GameId} -> sdd_game:do(GameId, PlayerId, Action, Args)
+	end,
+	{noreply, State};
+
 %% Syncs player state with client, updates our own current_game field
 
 handle_cast({sync_player_state, Points, Badges, CurrentGame}, State) ->
