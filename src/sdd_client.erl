@@ -11,10 +11,11 @@
 -module(sdd_client).
 
 %% API
--export([start_link/2, add_connection/3]).
+-export([start_link/2, add_connection/3, register/4]).
 
 %% GEN_SERVER
--export([init/1, handle_cast/2]).
+-behaviour(gen_server).
+-export([init/1, handle_cast/2, handle_call/3, handle_info/2, code_change/3, terminate/2]).
 
 %% Records
 -record(state, {
@@ -40,7 +41,12 @@ add_connection(ClientId, ConnectionPid, ConnectionActive) ->
 		undefined -> sdd_clients_sup:start_client(ClientId);
 		Pid -> Pid
 	end,
-	gen_server:cast(ClientPid, {add_connection, ConnectionPid, ConnectionActive}).
+	gen_server:cast(ClientPid, {add_connection, ConnectionPid, ConnectionActive}),
+	ClientPid.
+
+register(ClientPid, PlayerId, Name, Secret) ->
+	gen_server:cast(ClientPid, {register, PlayerId, Name, Secret}).
+
 
 %%% =================================================================================== %%%
 %%% GEN_SERVER CALLBACKS                                                                %%%
@@ -57,26 +63,6 @@ init({ClientId, ClientInfo}) ->
 	{ok, InitialState}.
 
 %% ------------------------------------------------------------------------------------- %%
-%% Tries to register a player and connect to it
-
-handle_call({register, PlayerId, Name, Secret}, _From, State) ->
-	case sdd_player:register(PlayerId, Name, Secret) of
-		ok ->
-			sdd_player:connect(PlayerId, State#state.id, State#state.info),
-			{reply, ok, State#state{player = PlayerId}};
-		already_exists -> {reply, already_exists, State}
-	end;
-
-%% Tries to authenticate with a secret and connect to the given player
-
-handle_call({login, PlayerId, Secret}, _From, State) ->
-	case sdd_player:authenticate(PlayerId, Secret) of
-		true -> 
-			sdd_player:connect(PlayerId, State#state.id, State#state.info),
-			{reply, ok, State#state{player = PlayerId}};
-		false -> {reply, authentication_failed, State}
-	end;
-
 %% Forwards a client event to the connection and updates current_game if it should change
 
 handle_call({handle_player_event, EventType, EventData}, _From, State) ->
@@ -103,6 +89,32 @@ handle_cast({add_connection, ConnectionPid, ConnectionActive}, State) ->
 	},
 	StateAfterHelloSent = add_message({hello, connected}, NewState),
 	{noreply, StateAfterHelloSent};
+
+%% Tries to register a player and connect to it
+
+handle_cast({register, PlayerId, Name, Secret}, State) ->
+	case sdd_player:register(PlayerId, Name, Secret) of
+		ok ->
+			sdd_player:connect(PlayerId, State#state.id, State#state.info),
+			StateAfterSend = add_message({register_ok}, State),
+			{noreply, StateAfterSend#state{player = PlayerId}};
+		already_exists ->
+			StateAfterSend = add_message({register_invalid}, State),
+			{noreply, StateAfterSend}
+	end;
+
+%% Tries to authenticate with a secret and connect to the given player
+
+handle_cast({login, PlayerId, Secret}, State) ->
+	case sdd_player:authenticate(PlayerId, Secret) of
+		true -> 
+			sdd_player:connect(PlayerId, State#state.id, State#state.info),
+			StateAfterSend = add_message({login_ok}, State),
+			{noreply, StateAfterSend#state{player = PlayerId}};
+		false ->
+			StateAfterSend = add_message({login_invalid}, State),
+			{noreply, authentication_failed, StateAfterSend}
+	end;
 
 %% Makes the player do something on behalf of the client
 
@@ -143,6 +155,17 @@ add_message(Message, State) ->
 				false -> State#state{messages = [], connection_can_send = false}
 			end
 	end.
+
+%% ------------------------------------------------------------------------------------- %%
+%% Rest of gen_server calls
+
+handle_info(_Info, State) ->
+	State.
+
+code_change(_OldVsn, State, _Extra) ->
+	{ok, State}.
+
+terminate(_Reason, _State) -> ok.
 
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%

@@ -24,7 +24,7 @@
 init(_Transport, Req, _Opts, Active) ->
 	io:format("bullet init~n"),
 	{ok, Req, #state{active = Active}}.
-	
+
 stream(<<"ping">>, Req, State) ->
 	io:format("ping received~n"),
 	{reply, <<"pong">>, Req, State};
@@ -50,7 +50,11 @@ terminate(_Req, _State) ->
 
 handle_json([<<"hello">>, ClientId], State) ->
 	ClientPid = sdd_client:add_connection(ClientId, self(), State#state.active),
-	State#state{client_pid = ClientPid}.
+	State#state{client_pid = ClientPid};
+
+handle_json([<<"register">>, [{<<"name">>, Name}, {<<"id">>, PlayerId}, {<<"secret">>, Secret}], _ClientId], State) ->
+	sdd_client:register(State#state.client_pid, PlayerId, Name, Secret),
+	State.
 
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
