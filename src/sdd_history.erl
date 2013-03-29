@@ -96,6 +96,19 @@ setup_persistence(HistoryType) ->
 		{disc_copies, [node()]}
 	]).
 
+%% ------------------------------------------------------------------------------------- %%
+%% Persists a history, identified by history type and id
+
+save_persisted(HistoryType, Id, History) ->
+	PersistedHistory = #persisted_history{
+		id = Id,
+		state = History#history.state,
+		past = History#history.past
+	},
+	mnesia:transaction(fun() ->
+		mnesia:write(HistoryType, PersistedHistory, write)
+	end).
+
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
 %%% =================================================================================== %%%
