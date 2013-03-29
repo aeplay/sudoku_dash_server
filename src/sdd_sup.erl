@@ -1,3 +1,11 @@
+%%% =================================================================================== %%%
+%%% Sudoku Dash Game: Main Supervisor                                                   %%%
+%%%                                                                                     %%%
+%%% Copyright 2012 Anselm Eickhoff                                                      %%%
+%%%                                                                                     %%%
+%%% This is the supervisor for all other supervisors                                    %%%
+%%% =================================================================================== %%%
+
 -module(sdd_sup).
 
 -behaviour(supervisor).
@@ -8,19 +16,32 @@
 %% Supervisor callbacks
 -export([init/1]).
 
-%% Helper macro for declaring children of supervisor
--define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
-
-%% ===================================================================
-%% API functions
-%% ===================================================================
+%%% =================================================================================== %%%
+%%% API                                                                                 %%%
+%%% =================================================================================== %%%
 
 start_link() ->
-	supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-%% ===================================================================
-%% Supervisor callbacks
-%% ===================================================================
+%%% =================================================================================== %%%
+%%% SUPERVISOR CALLBACKS                                                                %%%
+%%% =================================================================================== %%%
 
 init([]) ->
-	{ok, { {one_for_one, 5, 10}, []} }.
+	ClientSupSpec = {
+		clients_sup,
+		{sdd_clients_sup, start_link, []},
+		permanent,
+		1000,
+		supervisor,
+		[sdd_clients_sup]
+	},
+	PlayerSupSpec = {
+		players_sup,
+		{sdd_players_sup, start_link, []},
+		permanent,
+		1000,
+		supervisor,
+		[sdd_players_sup]
+	},
+	{ok, {{one_for_one, 5, 10}, [ClientSupSpec, PlayerSupSpec]}}.
