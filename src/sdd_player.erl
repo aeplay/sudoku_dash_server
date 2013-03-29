@@ -13,10 +13,11 @@
 -module(sdd_player).
 
 %% API
--export([do/3, handle_game_event/4, authenticate/2, connect/3]).
+-export([do/3, handle_game_event/4, register/3, authenticate/2, connect/3]).
 
 %% Records
 -record(state, {
+	id,
 	name,
 	secret,
 	current_game,
@@ -37,6 +38,16 @@ handle_game_event(PlayerId, GameId, EventType, EventData) ->
 		Reply -> Reply
 	catch
 		Error -> Error
+	end.
+
+register(PlayerId, Name, Secret) ->
+	case sdd_history:persisted_state(player_history, PlayerId) of
+		doesnt_exist ->
+			InitialHistory = sdd_history:new(fun realize_event/3),
+			History = sdd_history:append(InitialHistory, register, {PlayerId, Name, Secret}),
+			% TODO start player with history here
+			ok;
+		_Exists -> already_exists
 	end.
 
 authenticate(PlayerId, Secret) ->
@@ -139,8 +150,8 @@ handle_call({game_event, GameId, EventType, EventData}, _From, History) ->
 %% ------------------------------------------------------------------------------------- %%
 %% Create initial state
 
-realize_event(_EmptyState, register, {Name, Secret}) ->
-	#state{name = Name, secret = Secret, points = 0};
+realize_event(_EmptyState, register, {Id, Name, Secret}) ->
+	#state{id = Id, name = Name, secret = Secret, points = 0};
 
 %% Change current game
 
