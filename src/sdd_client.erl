@@ -45,7 +45,22 @@ handle_call({login, PlayerId, Secret}, _From, State) ->
 			sdd_player:connect(PlayerId, State#state.id, State#state.info),
 			{reply, ok, State#state{player = PlayerId}};
 		false -> {reply, authentication_failed, State}
-	end.
+	end;
+
+%% Forwards a client event to the connection and updates current_game if it should change
+
+handle_call({handle_player_event, EventType, EventData}, _From, State) ->
+	StateAfterForward = add_message({player_event, EventType, EventData}, State),
+	NewState = case EventType of
+		join ->
+			{GameId, _Source} = EventData,
+			StateAfterForward#state{current_game = GameId};
+		leave ->
+			StateAfterForward#state{current_game = undefined};
+		_OtherEvent ->
+			StateAfterForward
+	end,
+	{reply, continue_listening, NewState}.
 
 %% ------------------------------------------------------------------------------------- %%
 %% Adds a new connection, remembers its active state and resets whether we can send
@@ -70,21 +85,6 @@ handle_cast({player_do, Action, Args}, State) ->
 handle_cast({sync_player_state, Points, Badges, CurrentGame}, State) ->
 	StateAfterForward = add_message({sync_player_state, Points, Badges, CurrentGame}, State),
 	NewState = StateAfterForward#state{current_game = CurrentGame},
-	{noreply, NewState};
-
-%% Forwards a client event to the connection and updates current_game if it should change
-
-handle_cast({handle_player_event, EventType, EventData}, State) ->
-	StateAfterForward = add_message({player_event, EventType, EventData}, State),
-	NewState = case EventType of
-		join ->
-			{GameId, _Source} = EventData,
-			StateAfterForward#state{current_game = GameId};
-		leave ->
-			StateAfterForward#state{current_game = undefined};
-		_OtherEvent ->
-			StateAfterForward
-	end,
 	{noreply, NewState}.
 
 %%% =================================================================================== %%%
@@ -183,13 +183,13 @@ sync_player_state_updatesCurrentGameAndForwardsStateToConnection_test() ->
 	?assertEqual([{sync_player_state, 3, "Badges", "GameA"}], StateAfterSync#state.messages).
 
 handle_player_event_updatesCurrentGameAndForwardsEventsToConnection_test() ->
-	{noreply, StateAfterSomeEvent} = handle_cast({handle_player_event, some_type, some_data}, #state{}),
+	{reply, continue_listening, StateAfterSomeEvent} = handle_call({handle_player_event, some_type, some_data}, from, #state{}),
 	?assertEqual([{player_event, some_type, some_data}], StateAfterSomeEvent#state.messages),
 
-	{noreply, StateAfterJoin} = handle_cast({handle_player_event, join, {"GameA", random}}, #state{}),
+	{reply, continue_listening, StateAfterJoin} = handle_call({handle_player_event, join, {"GameA", random}}, from, #state{}),
 	?assertEqual("GameA", StateAfterJoin#state.current_game),
 
-	{noreply, StateAfterLeave} = handle_cast({handle_player_event, leave, fell_asleep}, StateAfterJoin),
+	{reply, continue_listening, StateAfterLeave} = handle_call({handle_player_event, leave, fell_asleep}, from, StateAfterJoin),
 	?assertEqual(undefined, StateAfterLeave#state.current_game).
 
 add_message_failsIfNoConnection_test() ->
