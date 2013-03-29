@@ -4,14 +4,14 @@
 
 -define(history_assert_state_field_equals(History, Field, ExpectedValue),
 	fun() ->
-		State = sdd_history:state(History),
-		?assertEqual(ExpectedValue, State#state.Field)
+		HistoryState = sdd_history:state(History),
+		?assertEqual(ExpectedValue, HistoryState#state.Field)
 	end ()
 ).
 
 -define(history_assert_past_matches(History, ExpectedMatch),
 	fun() ->
-		Past = sdd_history:past(History),
-		?assertMatch(ExpectedMatch, Past)
+		HistoryPast = sdd_history:past(History),
+		?assertMatch(ExpectedMatch, HistoryPast)
 	end ()
 ).

@@ -60,7 +60,13 @@ init(PlayerInfo) ->
 
 handle_cast({connect, ClientId, ClientInfo}, History) ->
 	ListenerFunction = fun
-		(state, PlayerState) -> sdd_client:sync_player_state(ClientId, sdd_client:extract_interesting_state(PlayerState));
+		(state, PlayerState) ->
+			sdd_client:sync_player_state(
+				ClientId,
+				PlayerState#state.points,
+				PlayerState#state.badges,
+				PlayerState#state.current_game
+			);
 		(event, {_Time, EventType, EventData}) -> sdd_client:handle_player_event(ClientId, EventType, EventData)
 	end,
 	HistoryWithListener = sdd_history:add_listener(History, ListenerFunction, tell_state),
@@ -166,7 +172,6 @@ realize_event(State, connect, {ClientId, _ClientInfo}) ->
 
 init_createsNewPlayerWithNameAndSecret_test() ->
 	{ok, InitialHistory} = ?init_peter,
-	State = sdd_history:state(InitialHistory),
 
 	?history_assert_state_field_equals(InitialHistory, name, "Peter"),
 	?history_assert_state_field_equals(InitialHistory, secret, "secret"),
@@ -261,10 +266,7 @@ handle_game_event_continuesListeningOnlyIfEventWasFromCurrentGame_test() ->
 		(_ClientId, _EventType, _EventData) -> ok
 	end),
 	meck:expect(sdd_client, sync_player_state, fun
-		(_ClientId, _PlayerState) -> ok
-	end),
-	meck:expect(sdd_client, extract_interesting_state, fun
-		(PlayerState) -> {PlayerState#state.current_game, PlayerState#state.points, PlayerState#state.badges}
+		(_ClientId, _Points, _Badges, _CurrentGame) -> ok
 	end)
 ).	
 
@@ -314,11 +316,11 @@ connect_setsNewClientAndMakesClientAListenerOfPlayerHistory_test() ->
 	?meck_sdd_client,
 
 	% make sure client gets player state without secret field
-	StateBeforeConnect = sdd_history:state(InitialHistory),
+	State = sdd_history:state(InitialHistory),
 
 	{noreply, HistoryAfterConnect} = handle_cast({connect, "ClientA", "ClientAInfo"}, InitialHistory),
 
-	?assert(meck:called(sdd_client, sync_player_state, ["ClientA", sdd_client:extract_interesting_state(StateBeforeConnect)])),
+	?assert(meck:called(sdd_client, sync_player_state, ["ClientA", State#state.points, State#state.badges, State#state.current_game])),
 
 	?assert(meck:called(sdd_client, handle_player_event, ["ClientA", connect, {"ClientA", "ClientAInfo"}])),
 	?assert(meck:validate(sdd_client)),
