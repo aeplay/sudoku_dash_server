@@ -97,9 +97,8 @@ handle_cast({add_connection, ConnectionPid, ConnectionActive}, State) ->
 handle_cast({register, PlayerId, Name, Secret}, State) ->
 	case sdd_player:register(PlayerId, Name, Secret) of
 		ok ->
-			sdd_player:connect(PlayerId, State#state.id, State#state.info),
 			StateAfterSend = add_message({register_ok}, State),
-			{noreply, StateAfterSend#state{player = PlayerId}};
+			{noreply, StateAfterSend};
 		already_exists ->
 			StateAfterSend = add_message({register_invalid}, State),
 			{noreply, StateAfterSend}

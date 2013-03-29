@@ -48,7 +48,7 @@ register(PlayerId, Name, Secret) ->
 		doesnt_exist ->
 			InitialHistory = sdd_history:new(fun realize_event/3),
 			History = sdd_history:append(InitialHistory, register, {PlayerId, Name, Secret}),
-			% TODO start player with history here
+			sdd_players_sup:start_player(PlayerId, History),
 			ok;
 		_Exists -> already_exists
 	end.
@@ -60,13 +60,13 @@ authenticate(PlayerId, Secret) ->
 	end.
 
 connect(PlayerId, ClientId, ClientInfo) ->
-	case erlang:is_process_alive(PlayerId) of
-		true -> do_nothing;
-		false ->
-			History = sdd_history:load_persisted(player_history, PlayerId, fun realize_event/3)
-			% TODO start player with history here
+	case global:whereis_name({player, PlayerId}) of
+		undefined ->
+			History = sdd_history:load_persisted(player_history, PlayerId, fun realize_event/3),
+			sdd_players_sup:start_player(PlayerId, History);
+		_Pid -> do_nothing
 	end,
-	gen_server:cast(PlayerId, {connect, ClientId, ClientInfo}).
+	gen_server:cast({global, {player, PlayerId}}, {connect, ClientId, ClientInfo}).
 
 %%% =================================================================================== %%%
 %%% GEN_SERVER CALLBACKS                                                                %%%
