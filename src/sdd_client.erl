@@ -37,6 +37,16 @@ init({ClientId, ClientInfo}) ->
 	{ok, InitialState}.
 
 %% ------------------------------------------------------------------------------------- %%
+%% Tries to register a player and connect to it
+
+handle_call({register, PlayerId, Name, Secret}, _From, State) ->
+	case sdd_player:register(PlayerId, Name, Secret) of
+		ok ->
+			sdd_player:connect(PlayerId, State#state.id, State#state.info),
+			{reply, ok, State#state{player = PlayerId}};
+		already_exists -> {reply, already_exists, State}
+	end;
+
 %% Tries to authenticate with a secret and connect to the given player
 
 handle_call({login, PlayerId, Secret}, _From, State) ->
