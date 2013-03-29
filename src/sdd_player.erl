@@ -45,7 +45,13 @@ authenticate(PlayerId, Secret) ->
 		_Else -> false
 	end.
 
-connect(PlayerId, ClientId, ClientInfo) ->	
+connect(PlayerId, ClientId, ClientInfo) ->
+	case erlang:is_process_alive(PlayerId) of
+		true -> do_nothing;
+		false ->
+			History = sdd_history:load_persisted(player_history, PlayerId, fun realize_event/3)
+			% TODO start player with history here
+	end,
 	gen_server:cast(PlayerId, {connect, ClientId, ClientInfo}).
 
 %%% =================================================================================== %%%
@@ -53,12 +59,9 @@ connect(PlayerId, ClientId, ClientInfo) ->
 %%% =================================================================================== %%%
 
 %% ------------------------------------------------------------------------------------- %%
-%% Creates a history for a new player, assigns the realizer function to it
-%% and adds a register event with the given player information
+%% Creates a new player process with the given history
 
-init(PlayerInfo) ->
-	EmptyHistory = sdd_history:new(fun realize_event/3),
-	InitialHistory = sdd_history:append(EmptyHistory, register, PlayerInfo),
+init(InitialHistory) ->
 	{ok, InitialHistory}.
 
 %% ------------------------------------------------------------------------------------- %%
@@ -174,15 +177,13 @@ realize_event(State, connect, {ClientId, _ClientInfo}) ->
 -include_lib("sdd_history_test_macros.hrl").
 
 
--define(init_peter, init({"Peter", "secret"})).
+-define(init_peter,
+	sdd_history:append(sdd_history:new(fun realize_event/3), register, {"Peter", "secret"})
+).
 
-init_createsNewPlayerWithNameAndSecret_test() ->
-	{ok, InitialHistory} = ?init_peter,
-
-	?history_assert_state_field_equals(InitialHistory, name, "Peter"),
-	?history_assert_state_field_equals(InitialHistory, secret, "secret"),
-	?history_assert_state_field_equals(InitialHistory, points, 0),
-	?history_assert_past_matches(InitialHistory, [{_Time, register, {"Peter", "secret"}}]).
+init_createsPlayerProcessWithAHistory_test() ->
+	{ok, InitialHistory} = init(dummy_history),
+	?assertEqual(InitialHistory, dummy_history).
 
 -define(meck_sdd_game_join,
 	meck:new(sdd_game),
@@ -195,7 +196,7 @@ init_createsNewPlayerWithNameAndSecret_test() ->
 join_notifiesGameWeWantToJoinAndSavesGameAsCurrentGameIfSuccessful_test() ->
 	?meck_sdd_game_join,
 
-	{ok, InitialHistory} = ?init_peter,
+	InitialHistory = ?init_peter,
 
 	{reply, nope, HistoryAfterBadJoin} = handle_call({join, {"BadGame", random}}, from, InitialHistory),
 	?assertEqual(HistoryAfterBadJoin, InitialHistory),
@@ -213,7 +214,7 @@ join_notifiesGameWeWantToJoinAndSavesGameAsCurrentGameIfSuccessful_test() ->
 
 -define(init_peter_and_join_good_game,
 	fun () ->
-		{ok, InitialHistory} = ?init_peter,
+		InitialHistory = ?init_peter,
 		handle_call({join, {"GoodGame", invite}}, from, InitialHistory)
 	end ()
 ).
@@ -297,7 +298,7 @@ handle_game_event_redirectsToCurrentClientIfExistsAndIfEventWasFromCurrentGame_t
 	meck:unload(sdd_client).
 
 get_points_addsPoints_test() ->
-	{ok, InitialHistory} = ?init_peter,
+	InitialHistory = ?init_peter,
 
 	{noreply, HistoryAfterGettingPoints} = handle_cast({get_points, 3}, InitialHistory),
 
@@ -305,7 +306,7 @@ get_points_addsPoints_test() ->
 	?history_assert_past_matches(HistoryAfterGettingPoints, [{_Time, get_points, 3} | _ ]).
 
 get_badge_addsABadge_test() ->
-	{ok, InitialHistory} = ?init_peter,
+	InitialHistory = ?init_peter,
 
 	Badge1 = {"Good Test Subject", "For being an important part of these unit tests"},
 	Badge2 = {"Good Person", "For having a beautiful personality"},
@@ -317,7 +318,7 @@ get_badge_addsABadge_test() ->
 	?history_assert_past_matches(HistoryAfterGettingSecondBadge, [{_Time2, get_badge, Badge2}, {_Time1, get_badge, Badge1} | _ ]).
 
 connect_setsNewClientAndMakesClientAListenerOfPlayerHistory_test() ->
-	{ok, InitialHistory} = ?init_peter,
+	InitialHistory = ?init_peter,
 
 	?meck_sdd_client,
 
