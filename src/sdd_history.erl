@@ -92,7 +92,7 @@ add_listener(History, ListenerFunction, SynchronizationType) ->
 setup_persistence(HistoryType) ->
 	mnesia:create_table(HistoryType, [
 		{attributes, record_info(fields, persisted_history)},
-		{index, [id]},
+		{record_name, persisted_history},
 		{disc_copies, [node()]}
 	]).
 
