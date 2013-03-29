@@ -109,6 +109,20 @@ save_persisted(HistoryType, Id, History) ->
 		mnesia:write(HistoryType, PersistedHistory, write)
 	end).
 
+%% ------------------------------------------------------------------------------------- %%
+%% Loads a persisted history
+
+load_persisted(HistoryType, Id, RealizerFunction) ->
+	case mnesia:transaction(fun() -> mnesia:read(HistoryType, Id) end) of
+		{atomic, []} -> doesnt_exist;
+		{atomic, [PersistedHistory]} ->
+			#history{
+				realizer_function = RealizerFunction,
+				state = PersistedHistory#persisted_history.state,
+				past = PersistedHistory#persisted_history.past
+			}
+	end.
+
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
 %%% =================================================================================== %%%
@@ -235,16 +249,15 @@ save_persisted_persistsAHistory_test() ->
 	?assert(meck:validate(mnesia)),
 	meck:unload(mnesia).
 
-create_or_load_persisted_DoesWhatItSays_test() ->
+load_persisted_DoesWhatItSays_test() ->
 	?meck_mnesia,
 
-	NewHistory = create_or_load_persisted(history_type, nonexisting_id, realizer_function),
+	NotExisting = load_persisted(history_type, nonexisting_id, realizer_function),
 
-	?assertEqual(#history{realizer_function = realizer_function}, NewHistory),
+	?assertEqual(doesnt_exist, NotExisting),
 	?assert(meck:called(mnesia, read, [history_type, nonexisting_id])),
-	?assert(meck:called(mnesia, write, [history_type, #persisted_history{id = nonexisting_id, state = undefined, past = []}, write])),
 
-	ExisitingHistory = create_or_load_persisted(history_type, existing_id, realizer_function),
+	ExisitingHistory = load_persisted(history_type, existing_id, realizer_function),
 
 	?assertEqual(
 		#history{
@@ -255,7 +268,6 @@ create_or_load_persisted_DoesWhatItSays_test() ->
 		ExisitingHistory
 	),
 	?assert(meck:called(mnesia, read, [history_type, existing_id])),
-	?assertNot(meck:called(mnesia, write, [history_type, #persisted_history{id = existing_id, state = undefined, past = []}, write])),
 
 	?assert(meck:validate(mnesia)),
 	meck:unload(mnesia).
