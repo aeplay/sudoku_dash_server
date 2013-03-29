@@ -123,6 +123,15 @@ load_persisted(HistoryType, Id, RealizerFunction) ->
 			}
 	end.
 
+%% ------------------------------------------------------------------------------------- %%
+%% Returns the state of a persisted history, if it exists
+
+persisted_state(HistoryType, Id) ->
+	case mnesia:transaction(fun() -> mnesia:read(HistoryType, Id) end) of
+		{atomic, []} -> doesnt_exist;
+		{atomic, [PersistedHistory]} -> PersistedHistory#persisted_history.state
+	end.
+
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
 %%% =================================================================================== %%%
