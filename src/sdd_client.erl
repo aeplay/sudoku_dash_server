@@ -70,6 +70,21 @@ handle_cast({player_do, Action, Args}, State) ->
 handle_cast({sync_player_state, Points, Badges, CurrentGame}, State) ->
 	StateAfterForward = add_message({sync_player_state, Points, Badges, CurrentGame}, State),
 	NewState = StateAfterForward#state{current_game = CurrentGame},
+	{noreply, NewState};
+
+%% Forwards a client event to the connection and updates current_game if it should change
+
+handle_cast({handle_player_event, EventType, EventData}, State) ->
+	StateAfterForward = add_message({player_event, EventType, EventData}, State),
+	NewState = case EventType of
+		join ->
+			{GameId, _Source} = EventData,
+			StateAfterForward#state{current_game = GameId};
+		leave ->
+			StateAfterForward#state{current_game = undefined};
+		_OtherEvent ->
+			StateAfterForward
+	end,
 	{noreply, NewState}.
 
 %%% =================================================================================== %%%
