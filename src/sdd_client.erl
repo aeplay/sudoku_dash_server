@@ -11,7 +11,10 @@
 -module(sdd_client).
 
 %% API
--export([add_connection/3]).
+-export([start_link/2, add_connection/3]).
+
+%% GEN_SERVER
+-export([init/1, handle_cast/2]).
 
 %% Records
 -record(state, {
@@ -28,6 +31,9 @@
 %%% =================================================================================== %%%
 %%% API                                                                                 %%%
 %%% =================================================================================== %%%
+
+start_link(ClientId, ClientInfo) ->
+	gen_server:start_link({global, {client, ClientId}}, ?MODULE, {ClientId, ClientInfo}, []).
 
 add_connection(ClientId, ConnectionPid, ConnectionActive) ->
 	ClientPid = case global:whereis_name({client, ClientId}) of
@@ -95,7 +101,7 @@ handle_cast({add_connection, ConnectionPid, ConnectionActive}, State) ->
 		connection_active = ConnectionActive,
 		connection_can_send = true
 	},
-	StateAfterHelloSent = add_message(hello, NewState),
+	StateAfterHelloSent = add_message({hello, connected}, NewState),
 	{noreply, StateAfterHelloSent};
 
 %% Makes the player do something on behalf of the client
@@ -218,7 +224,7 @@ add_connection_setsNewConnectionSavesItsActiveStateAndRepliesWithHello_test() ->
 	?assertEqual(true, State#state.connection_can_send),
 
 	receive
-		{messages, [hello]} -> ?assert(true)
+		{messages, [{hello, connected}]} -> ?assert(true)
 	after
 		100 -> ?assert(false)
 	end.

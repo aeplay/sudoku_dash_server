@@ -24,7 +24,10 @@
 init(_Transport, Req, _Opts, Active) ->
 	io:format("bullet init~n"),
 	{ok, Req, #state{active = Active}}.
-
+	
+stream(<<"ping">>, Req, State) ->
+	io:format("ping received~n"),
+	{reply, <<"pong">>, Req, State};
 stream(Data, Req, State) ->
 	io:format("stream received ~s~n", [Data]),
 	NewState = handle_json(sdd_json:decode(Data), State),
@@ -32,7 +35,7 @@ stream(Data, Req, State) ->
 
 info(Info, Req, State) ->
 	io:format("info received ~p~n", [Info]),
-	{ok, Req, State}.
+	{reply, sdd_json:encode(Info), Req, State}.
 
 terminate(_Req, _State) ->
 	io:format("bullet terminate~n"),
