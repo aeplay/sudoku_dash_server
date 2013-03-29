@@ -22,6 +22,11 @@
 	listeners = []
 }).
 
+-record(persisted_history, {
+	id,
+	past = [],
+	state = undefined
+}).
 
 %%% =================================================================================== %%%
 %%% API                                                                                 %%%
@@ -163,5 +168,24 @@ append_NotifiesListenersAndRemovesOnesThatAreUninterested_test() ->
 	receive {_Time, e_type, e_data} -> ?assert(true)
 	after 10 -> ?assert(false)
 	end.
+
+setup_persistence_createsMnesiaTables_test() ->
+	meck:new(mnesia),
+	meck:expect(mnesia, create_table, fun
+		(_TableName, _Opts) -> {atomic, ok}
+	end),
+
+	setup_persistence(history_type),
+
+	?assert(meck:called(mnesia, create_table, [history_type,
+		[
+			{attributes, record_info(fields, persisted_history)},
+			{index, [id]},
+			{disc_copies, [node()]}
+		]
+	])),
+	?assert(meck:validate(mnesia)),
+	meck:unload(mnesia).
+
 
 -endif.
