@@ -179,11 +179,23 @@ append_NotifiesListenersAndRemovesOnesThatAreUninterested_test() ->
 	after 10 -> ?assert(false)
 	end.
 
-setup_persistence_createsMnesiaTables_test() ->
+-define(meck_mnesia,
 	meck:new(mnesia),
 	meck:expect(mnesia, create_table, fun
 		(_TableName, _Opts) -> {atomic, ok}
 	end),
+	meck:expect(mnesia, transaction, fun
+		(TransactionF) ->
+			Result = TransactionF(),
+			{atomic, Result}
+	end),
+	meck:expect(mnesia, write, fun
+		(_Table, _Record, write) -> ok
+	end)
+).
+
+setup_persistence_createsMnesiaTables_test() ->
+	?meck_mnesia,
 
 	setup_persistence(history_type),
 
@@ -197,5 +209,13 @@ setup_persistence_createsMnesiaTables_test() ->
 	?assert(meck:validate(mnesia)),
 	meck:unload(mnesia).
 
+save_persisted_persistsAHistory_test() ->
+	?meck_mnesia,
+
+	save_persisted(history_type, some_id, #history{state = some_state, past = some_past}),
+
+	?assert(meck:called(mnesia, write, [history_type, #persisted_history{id = some_id, state = some_state, past = some_past}, write])),
+	?assert(meck:validate(mnesia)),
+	meck:unload(mnesia).
 
 -endif.
