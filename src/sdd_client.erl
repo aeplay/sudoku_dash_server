@@ -167,6 +167,16 @@ sync_player_state_updatesCurrentGameAndForwardsStateToConnection_test() ->
 	?assertEqual("GameA", StateAfterSync#state.current_game),
 	?assertEqual([{sync_player_state, 3, "Badges", "GameA"}], StateAfterSync#state.messages).
 
+handle_player_event_updatesCurrentGameAndForwardsEventsToConnection_test() ->
+	{noreply, StateAfterSomeEvent} = handle_cast({handle_player_event, some_type, some_data}, #state{}),
+	?assertEqual([{player_event, some_type, some_data}], StateAfterSomeEvent#state.messages),
+
+	{noreply, StateAfterJoin} = handle_cast({handle_player_event, join, {"GameA", random}}, #state{}),
+	?assertEqual("GameA", StateAfterJoin#state.current_game),
+
+	{noreply, StateAfterLeave} = handle_cast({handle_player_event, leave, fell_asleep}, StateAfterJoin),
+	?assertEqual(undefined, StateAfterLeave#state.current_game).
+
 add_message_failsIfNoConnection_test() ->
 	State = #state{
 		messages = [message_a]
