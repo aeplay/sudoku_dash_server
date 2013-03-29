@@ -63,7 +63,14 @@ handle_cast({add_connection, ConnectionPid, ConnectionActive}, State) ->
 
 handle_cast({player_do, Action, Args}, State) ->
 	sdd_player:do(State#state.player, Action, Args),
-	{noreply, State}.
+	{noreply, State};
+
+%% Syncs player state with client, updates our own current_game field
+
+handle_cast({sync_player_state, Points, Badges, CurrentGame}, State) ->
+	StateAfterForward = add_message({sync_player_state, Points, Badges, CurrentGame}, State),
+	NewState = StateAfterForward#state{current_game = CurrentGame},
+	{noreply, NewState}.
 
 %%% =================================================================================== %%%
 %%% UTILITY FUNCTION                                                                    %%%
