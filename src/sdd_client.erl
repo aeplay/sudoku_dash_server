@@ -176,6 +176,30 @@ player_do_forwardsActionToPlayer_test() ->
 	?assert(meck:validate(sdd_player)),
 	meck:unload(sdd_player).
 
+game_do_forwardsActionToGameIfWeAreInOne_test() ->
+	%% nothing should be called in these, else exception
+	StateWithOnlyGame = #state{current_game = "GameA"},
+	{noreply, StateAfterDoWithoutPlayer} = handle_cast({game_do, "Action", "Args"}, StateWithOnlyGame),
+	?assertEqual(StateWithOnlyGame, StateAfterDoWithoutPlayer),
+
+	StateWithOnlyPlayer = #state{player = "Peter"},
+	{noreply, StateAfterDoWithoutGame} = handle_cast({game_do, "Action", "Args"}, StateWithOnlyPlayer),
+	?assertEqual(StateWithOnlyPlayer, StateAfterDoWithoutGame),
+
+	meck:new(sdd_game),
+	meck:expect(sdd_game, do, fun
+		(_GameId, _Action, _Args) -> ok
+	end),
+
+	StateWithPlayerAndGame = #state{player = "Peter", current_game = "GameA"},
+	{noreply, StateAfterDoWithGame} = handle_cast({game_do, "Action", "Args"}, StateWithPlayerAndGame),
+
+	?assert(meck:called(sdd_game, do, ["GameA", "Player", "Action", "Args"])),
+	?assert(meck:validate(sdd_game)),
+	meck:unload(sdd_game),
+
+	?assertEqual(StateWithPlayerAndGame, StateAfterDoWithGame).
+
 sync_player_state_updatesCurrentGameAndForwardsStateToConnection_test() ->
 	{noreply, StateAfterSync} = handle_cast({sync_player_state, 3, "Badges", "GameA"}, #state{}),
 
