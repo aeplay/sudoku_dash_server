@@ -97,7 +97,7 @@ handle_cast({connect, ClientId, ClientInfo}, History) ->
 
 handle_cast({leave, Reason}, History) ->
 	State = sdd_history:state(History),
-	sdd_game:leave(State#state.name, State#state.current_game, Reason),
+	sdd_game:leave(State#state.id, State#state.current_game, Reason),
 	NewHistory = sdd_history:append(History, leave, Reason),
 	{noreply, NewHistory};
 
@@ -118,7 +118,7 @@ handle_cast({get_badge, Badge}, History) ->
 
 handle_call({join, {GameId, Source}}, _From, History) ->
 	State = sdd_history:state(History),
-	case sdd_game:join(State#state.name, GameId, Source) of
+	case sdd_game:join(State#state.id, GameId, Source) of
 		ok ->
 			NewHistory = sdd_history:append(History, join, {GameId, Source}),
 			{reply, ok, NewHistory};
@@ -189,7 +189,7 @@ realize_event(State, connect, {ClientId, _ClientInfo}) ->
 
 
 -define(init_peter,
-	sdd_history:append(sdd_history:new(fun realize_event/3), register, {"Peter", "secret"})
+	sdd_history:append(sdd_history:new(fun realize_event/3), register, {"Peter", "Name", "secret"})
 ).
 
 init_createsPlayerProcessWithAHistory_test() ->
