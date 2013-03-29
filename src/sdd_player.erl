@@ -13,7 +13,7 @@
 -module(sdd_player).
 
 %% API
--export([do/3, handle_game_event/4, register/3, authenticate/2, connect/3]).
+-export([start_link/2, do/3, handle_game_event/4, register/3, authenticate/2, connect/3]).
 
 %% Records
 -record(state, {
@@ -29,6 +29,9 @@
 %%% =================================================================================== %%%
 %%% API                                                                                 %%%
 %%% =================================================================================== %%%
+
+start_link(PlayerId, History) ->
+	gen_server:start_link({global, {player, PlayerId}}, ?MODULE, [History], []).
 
 do(PlayerId, Action, Args) ->
 	gen_server:cast(PlayerId, {Action, Args}).

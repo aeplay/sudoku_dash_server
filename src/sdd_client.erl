@@ -10,6 +10,9 @@
 
 -module(sdd_client).
 
+%% API
+-export([add_connection/3]).
+
 %% Records
 -record(state, {
 	id,
@@ -21,6 +24,17 @@
 	player,
 	current_game
 }).
+
+%%% =================================================================================== %%%
+%%% API                                                                                 %%%
+%%% =================================================================================== %%%
+
+add_connection(ClientId, ConnectionPid, ConnectionActive) ->
+	ClientPid = case erlang:is_process_alive({global, {client, ClientId}}) of
+		true -> {global, {client, ClientId}};
+		false -> sdd_clients_sup:start_client(ClientId)
+	end,
+	gen_server:cast(ClientId, {add_connection, ConnectionPid, ConnectionActive}).
 
 %%% =================================================================================== %%%
 %%% GEN_SERVER CALLBACKS                                                                %%%
