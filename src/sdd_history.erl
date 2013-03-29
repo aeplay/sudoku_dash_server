@@ -12,7 +12,7 @@
 -module(sdd_history).
 
 %% API
--export([new/1, state/1, past/1, append/3, add_listener/3]).
+-export([new/1, state/1, past/1, append/3, add_listener/3, setup_persistence/1, save_persisted/3, load_persisted/3, persisted_state/2]).
 
 %% Types and Records
 -record(history, {

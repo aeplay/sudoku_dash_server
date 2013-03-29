@@ -13,7 +13,7 @@
 -module(sdd_player).
 
 %% API
--export([do/3, handle_game_event/4, connect/3]).
+-export([do/3, handle_game_event/4, authenticate/2, connect/3]).
 
 %% Records
 -record(state, {
@@ -37,6 +37,12 @@ handle_game_event(PlayerId, GameId, EventType, EventData) ->
 		Reply -> Reply
 	catch
 		Error -> Error
+	end.
+
+authenticate(PlayerId, Secret) ->
+	case sdd_history:persisted_state(player_history, PlayerId) of
+		#state{secret = Secret} -> true;
+		_Else -> false
 	end.
 
 connect(PlayerId, ClientId, ClientInfo) ->	
