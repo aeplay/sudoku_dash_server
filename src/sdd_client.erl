@@ -188,13 +188,13 @@ game_do_forwardsActionToGameIfWeAreInOne_test() ->
 
 	meck:new(sdd_game),
 	meck:expect(sdd_game, do, fun
-		(_GameId, _Action, _Args) -> ok
+		(_GameId, _PlayerId, _Action, _Args) -> ok
 	end),
 
 	StateWithPlayerAndGame = #state{player = "Peter", current_game = "GameA"},
 	{noreply, StateAfterDoWithGame} = handle_cast({game_do, "Action", "Args"}, StateWithPlayerAndGame),
 
-	?assert(meck:called(sdd_game, do, ["GameA", "Player", "Action", "Args"])),
+	?assert(meck:called(sdd_game, do, ["GameA", "Peter", "Action", "Args"])),
 	?assert(meck:validate(sdd_game)),
 	meck:unload(sdd_game),
 
