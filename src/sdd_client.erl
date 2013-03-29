@@ -38,7 +38,9 @@ start_link(ClientId, ClientInfo) ->
 
 add_connection(ClientId, ConnectionPid, ConnectionActive) ->
 	ClientPid = case global:whereis_name({client, ClientId}) of
-		undefined -> sdd_clients_sup:start_client(ClientId);
+		undefined ->
+			{ok, Pid} = sdd_clients_sup:start_client(ClientId),
+			Pid;
 		Pid -> Pid
 	end,
 	gen_server:cast(ClientPid, {add_connection, ConnectionPid, ConnectionActive}),
