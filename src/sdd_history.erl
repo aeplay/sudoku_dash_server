@@ -204,6 +204,10 @@ append_NotifiesListenersAndRemovesOnesThatAreUninterested_test() ->
 	end),
 	meck:expect(mnesia, write, fun
 		(_Table, _Record, write) -> ok
+	end),
+	meck:expect(mnesia, read, fun
+		(_Table, nonexisting_id) -> [];
+		(_Table, existing_id) -> [#persisted_history{id = existing_id, state = existing_state, past = existing_past}]
 	end)
 ).
 
@@ -228,6 +232,31 @@ save_persisted_persistsAHistory_test() ->
 	save_persisted(history_type, some_id, #history{state = some_state, past = some_past}),
 
 	?assert(meck:called(mnesia, write, [history_type, #persisted_history{id = some_id, state = some_state, past = some_past}, write])),
+	?assert(meck:validate(mnesia)),
+	meck:unload(mnesia).
+
+create_or_load_persisted_DoesWhatItSays_test() ->
+	?meck_mnesia,
+
+	NewHistory = create_or_load_persisted(history_type, nonexisting_id, realizer_function),
+
+	?assertEqual(#history{realizer_function = realizer_function}, NewHistory),
+	?assert(meck:called(mnesia, read, [history_type, nonexisting_id])),
+	?assert(meck:called(mnesia, write, [history_type, #persisted_history{id = nonexisting_id, state = undefined, past = []}, write])),
+
+	ExisitingHistory = create_or_load_persisted(history_type, existing_id, realizer_function),
+
+	?assertEqual(
+		#history{
+			state = existing_state,
+			past = existing_past,
+			realizer_function = realizer_function
+		},
+		ExisitingHistory
+	),
+	?assert(meck:called(mnesia, read, [history_type, existing_id])),
+	?assertNot(meck:called(mnesia, write, [history_type, #persisted_history{id = existing_id, state = undefined, past = []}, write])),
+
 	?assert(meck:validate(mnesia)),
 	meck:unload(mnesia).
 
