@@ -86,6 +86,16 @@ add_listener(History, ListenerFunction, SynchronizationType) ->
 	NewListeners = [ListenerFunction|History#history.listeners],
 	History#history{listeners = NewListeners}.
 
+%% ------------------------------------------------------------------------------------- %%
+%% Creates Mnesia table that will be needed to persist histories of a given type
+
+setup_persistence(HistoryType) ->
+	mnesia:create_table(HistoryType, [
+		{attributes, record_info(fields, persisted_history)},
+		{index, [id]},
+		{disc_copies, [node()]}
+	]).
+
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
 %%% =================================================================================== %%%
