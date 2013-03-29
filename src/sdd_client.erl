@@ -129,6 +129,10 @@ add_message(Message, State) ->
 		("Peter", "GoodSecret") -> true;
 		("Peter", "BadSecret") -> false
 	end),
+	meck:expect(sdd_player, register, fun
+		("PaulId", "Paul", _Secret) -> already_exists;
+		("PetraId", "Petra", _Secret) -> ok
+	end),
 	meck:expect(sdd_player, connect, fun
 		(_PlayerId, _ClientId, _ClientInfo) -> ok
 	end),
@@ -141,6 +145,26 @@ init_savesClientIdAndInfo_test() ->
 	{ok, InitialState} = init({"ClientId", "ClientInfo"}),
 	?assertEqual("ClientId", InitialState#state.id),
 	?assertEqual("ClientInfo", InitialState#state.info).
+
+register_triesToRegisterPlayerAndConnectsIfSuccessful_test() ->
+	?meck_sdd_player,
+
+	InitialState = #state{id = "ClientId", info = "ClientInfo", player = undefined},
+
+	{reply, already_exists, StateAfterBadRegister} = handle_call({register, "PaulId", "Paul","Secret"}, from, InitialState),
+
+	?assert(meck:called(sdd_player, register, ["PaulId", "Paul", "Secret"])),
+	?assertNot(meck:called(sdd_player, connect, ["PaulId", "ClientId", "ClientInfo"])),
+	?assertEqual(StateAfterBadRegister#state.player, undefined),
+
+	{reply, ok, StateAfterGoodRegister} = handle_call({register, "PetraId", "Petra","Secret"}, from, InitialState),
+
+	?assert(meck:called(sdd_player, register, ["PetraId", "Petra", "Secret"])),
+	?assert(meck:called(sdd_player, connect, ["PetraId", "ClientId", "ClientInfo"])),
+	?assertEqual(StateAfterGoodRegister#state.player, "PetraId"),
+
+	?assert(meck:validate(sdd_player)),
+	meck:unload(sdd_player).
 
 login_authenticatesWithPlayerAndConnectsIfSuccessful_test() ->	
 	?meck_sdd_player,
