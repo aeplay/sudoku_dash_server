@@ -272,4 +272,18 @@ load_persisted_DoesWhatItSays_test() ->
 	?assert(meck:validate(mnesia)),
 	meck:unload(mnesia).
 
+persisted_state_returnsTheStateOfApersistedHistoryIfItExists_test() ->
+	?meck_mnesia,
+
+	NonExistingState = persisted_state(history_type, nonexisting_id),
+	?assertEqual(doesnt_exist, NonExistingState),
+	?assert(meck:called(mnesia, read, [history_type, nonexisting_id])),
+
+	ExistingState = persisted_state(history_type, existing_id),
+	?assertEqual(existing_state, ExistingState),
+	?assert(meck:called(mnesia, read, [history_type, existing_id])),
+
+	?assert(meck:validate(mnesia)),
+	meck:unload(mnesia).
+
 -endif.
