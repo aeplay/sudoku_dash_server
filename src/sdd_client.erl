@@ -154,6 +154,19 @@ player_do_forwardsActionToPlayer_test() ->
 	?assert(meck:validate(sdd_player)),
 	meck:unload(sdd_player).
 
+sync_player_state_updatesCurrentGameAndForwardsStateToConnection_test() ->
+	State = #state{connection = self(), connection_can_send = true, connection_active = true},
+
+	{noreply, StateAfterSync} = handle_cast({sync_player_state, 3, "Badges", "GameA"}, State),
+
+	?assertEqual("GameA", StateAfterSync#state.current_game),
+
+	receive
+		{messages, [{sync_player_state, 3, "Badges", "GameA"}]} -> ?assert(true)
+	after
+		100 ->	?assert(false)
+	end.
+
 add_message_failsIfNoConnection_test() ->
 	State = #state{
 		messages = [message_a]
