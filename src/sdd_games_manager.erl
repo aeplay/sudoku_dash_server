@@ -8,6 +8,13 @@
 
 -module(sdd_games_manager).
 
+%% API
+-export([start_link/0, find_game_and_join/2]).
+
+%% GEN_SERVER
+-behaviour(gen_server).
+-export([init/1, handle_cast/2, handle_call/3, handle_info/2, code_change/3, terminate/2]).
+
 %% Types and Records
 -record(state, {
 	games = []
@@ -20,8 +27,31 @@
 -endif.
 
 %%% =================================================================================== %%%
+%%% API                                                                                 %%%
+%%% =================================================================================== %%%
+
+start_link() ->
+	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+find_game_and_join(PlayerId, _Options) ->
+	gen_server:cast(?MODULE, {find_game_and_join, PlayerId}).
+
+%%% =================================================================================== %%%
 %%% GEN_SERVER CALLBACKS                                                                %%%
 %%% =================================================================================== %%%
+
+init(_Opts) ->
+	{ok, #state{}}.
+
+handle_cast({find_game_and_join, PlayerId}, State) ->
+	OpenGames = lists:filter(fun({_GameId, NPlayers}) -> NPlayers < ?MAX_PLAYERS_PER_GAME end, State#state.games),
+	{GameToJoin, NewState} = case OpenGames of
+		[Game] -> {Game, State};
+		[Game | _] -> {Game, State};
+		[] -> create_game(State)
+	end,
+	StateAfterJoin = join(PlayerId, GameToJoin, random, NewState),
+	{noreply, StateAfterJoin};
 
 %% ------------------------------------------------------------------------------------- %%
 %% Removes a player from a game and decreases the according player counter
@@ -32,6 +62,20 @@ handle_cast({leave, PlayerId, GameId, Reason}, State) ->
 	NewGames = lists:keyreplace(GameId, 1, State#state.games, {GameId, OldPlayerCount - 1}),
 	{noreply, State#state{games = NewGames}}.
 
+%% ------------------------------------------------------------------------------------- %%
+%% Rest of gen_server calls
+
+handle_call(_Req, _From, State) ->
+	State.
+
+handle_info(_Info, State) ->
+	State.
+
+code_change(_OldVsn, State, _Extra) ->
+	{ok, State}.
+
+terminate(_Reason, _State) -> ok.
+
 %%% =================================================================================== %%%
 %%% UTILITY FUNCTIONS                                                                   %%%
 %%% =================================================================================== %%%
@@ -40,7 +84,8 @@ handle_cast({leave, PlayerId, GameId, Reason}, State) ->
 %% Starts a new game and registers it
 
 create_game(State) ->
-	GameId = sdd_game:start_link(no_options),
+	GameId = uuid:to_string(uuid:uuid4()),
+	sdd_games_sup:start_game(GameId),
 	Games = State#state.games,
 	NewGames = [{GameId, 0}|Games],
 	{GameId, State#state{games = NewGames}}.
@@ -49,11 +94,13 @@ join(PlayerId, GameId, Source, State) ->
 	{GameId, OldPlayerCount} = lists:keyfind(GameId, 1, State#state.games),
 	case OldPlayerCount < ?MAX_PLAYERS_PER_GAME of
 		true ->
-			case sdd_game:do(GameId, PlayerId, join, Source) of
+			sdd_player:do(PlayerId, join, {GameId, Source}),
+			case sdd_game:join(GameId, PlayerId, Source) of
 				ok ->
 					NewGames = lists:keyreplace(GameId, 1, State#state.games, {GameId, OldPlayerCount + 1}),
 					{ok, State#state{games = NewGames}};
 				_Error ->
+					sdd_player:do(PlayerId, leave, join_error),
 					{_Error, State}
 			end;
 		false ->

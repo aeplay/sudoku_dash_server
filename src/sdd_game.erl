@@ -12,10 +12,15 @@
 -module(sdd_game).
 
 %% API
--export([join/3, do/4]).
+-export([start_link/1, join/3, do/4]).
+
+%% GEN_SERVER
+-behaviour(gen_server).
+-export([init/1, handle_cast/2, handle_call/3, handle_info/2, code_change/3, terminate/2]).
 
 %% Records
 -record(state, {
+	id,
 	board,
 	candidates,
 	complete = false,
@@ -36,11 +41,14 @@
 %%% API                                                                                 %%%
 %%% =================================================================================== %%%
 
+start_link(Id) ->
+	gen_server:start_link({global, {game, Id}}, ?MODULE, Id, []).
+
 join(GameId, PlayerId, Source) ->
-	gen_server:call(GameId, {join, PlayerId, Source}).
+	gen_server:call({global, {game, GameId}}, {join, PlayerId, Source}).
 
 do(GameId, PlayerId, Action, Args) ->
-	gen_server:cast(GameId, {Action, PlayerId, Args}).
+	gen_server:cast({global, {game, GameId}}, {Action, PlayerId, Args}).
 
 %%% =================================================================================== %%%
 %%% GEN_SERVER CALLBACKS                                                                %%%
@@ -50,18 +58,19 @@ do(GameId, PlayerId, Action, Args) ->
 %% Initializes the history, and assigns the realizer function to it.
 %% Generates the intial sudoku board saves that as the first event
 
-init(_Opts) ->
+init(Id) ->
 	EmptyHistory = sdd_history:new(fun realize_event/3),
 	InitialBoard = sdd_logic:generate_sudoku(),
-	InitialHistory = sdd_history:append(EmptyHistory, start, InitialBoard),
+	InitialHistory = sdd_history:append(EmptyHistory, start, {Id, InitialBoard}),
 	{ok, InitialHistory}.
 
 %% ------------------------------------------------------------------------------------- %%
 %% Adds a player to the game (if it's not full), by creating an listener function
 
 handle_call({join, PlayerId, Source}, _From, History) ->
+	State = sdd_history:state(History),
 	ListenerFunction = fun(event, {_Time, EventType, EventData}) ->
-		sdd_player:handle_game_event(PlayerId, EventType, EventData)
+		sdd_player:handle_game_event(PlayerId, State#state.id, EventType, EventData)
 	end,
 	HistoryWithNewListener = sdd_history:add_listener(History, ListenerFunction, replay_past),
 	NewHistory = sdd_history:append(HistoryWithNewListener, join, {PlayerId, Source}),
@@ -106,6 +115,14 @@ handle_cast({guess, PlayerId, {Position, Number}}, History) ->
 handle_info(stop_complete, History) ->
 	{stop, complete, History}.
 
+%% ------------------------------------------------------------------------------------- %%
+%% Rest of gen_server calls
+
+code_change(_OldVsn, State, _Extra) ->
+	{ok, State}.
+
+terminate(_Reason, _State) -> ok.
+
 %%% =================================================================================== %%%
 %%% HISTORY CALLBACKS                                                                   %%%
 %%% =================================================================================== %%%
@@ -113,9 +130,9 @@ handle_info(stop_complete, History) ->
 %% ------------------------------------------------------------------------------------- %%
 %% Uses the initial sudoku board to create the initial state, including candidates
 
-realize_event(_EmptyState, start, InitialBoard) ->
+realize_event(_EmptyState, start, {Id, InitialBoard}) ->
 	InitialCandidates = sdd_logic:calculate_candidates(InitialBoard, ?CANDIDATE_SOPHISTICATION),
-	#state{board = InitialBoard, candidates = InitialCandidates};
+	#state{id = Id, board = InitialBoard, candidates = InitialCandidates};
 
 %% Update the board and candidates after a good guess, check if it is complete
 

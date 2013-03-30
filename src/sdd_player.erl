@@ -38,10 +38,10 @@ start_link(PlayerId, History) ->
 	gen_server:start_link({global, {player, PlayerId}}, ?MODULE, History, []).
 
 do(PlayerId, Action, Args) ->
-	gen_server:cast(PlayerId, {Action, Args}).
+	gen_server:cast({global, {player, PlayerId}}, {Action, Args}).
 
 handle_game_event(PlayerId, GameId, EventType, EventData) ->
-	try gen_server:call(PlayerId, {game_event, GameId, EventType, EventData}, 100) of
+	try gen_server:call({global, {player, PlayerId}}, {handle_game_event, GameId, EventType, EventData}, 5000) of
 		Reply -> Reply
 	catch
 		Error -> Error
@@ -111,6 +111,13 @@ handle_cast({connect, ClientId, ClientInfo}, History) ->
 	erlang:display("Client connected"),
 	{noreply, NewHistory};
 
+%% Finds a game and joins it
+
+handle_cast({find_game, Options}, History) ->
+	State = sdd_history:state(History),
+	sdd_games_manager:find_game_and_join(State#state.id, Options),
+	{noreply, History};
+
 %% Leaves the current game, for a reason, and notifies the game
 
 handle_cast({leave, Reason}, History) ->
@@ -129,25 +136,19 @@ handle_cast({get_points, Increase}, History) ->
 
 handle_cast({get_badge, Badge}, History) ->
 	NewHistory = sdd_history:append(History, get_badge, Badge),
+	{noreply, NewHistory};
+
+
+%% Does our part of joining a game, coming from a source
+handle_cast({join, {GameId, Source}}, History) ->
+	NewHistory = sdd_history:append(History, join, {GameId, Source}),
 	{noreply, NewHistory}.
 
 %% ------------------------------------------------------------------------------------- %%
-%% Tries to join a game, coming from a source
-
-handle_call({join, {GameId, Source}}, _From, History) ->
-	State = sdd_history:state(History),
-	case sdd_game:join(State#state.id, GameId, Source) of
-		ok ->
-			NewHistory = sdd_history:append(History, join, {GameId, Source}),
-			{reply, ok, NewHistory};
-		Error ->
-			{reply, Error, History}
-	end;
-
 %% Returns continue_listening for events from our current game
 %% and redirects them to the client
 
-handle_call({game_event, GameId, EventType, EventData}, _From, History) ->
+handle_call({handle_game_event, GameId, EventType, EventData}, _From, History) ->
 	State = sdd_history:state(History),
 	CurrentGame = State#state.current_game,
 	case GameId of

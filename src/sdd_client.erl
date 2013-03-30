@@ -11,7 +11,8 @@
 -module(sdd_client).
 
 %% API
--export([start_link/2, add_connection/3, register/4, login/2, sync_player_state/4, handle_player_event/3]).
+-export([start_link/2, add_connection/3, register/4, login/2, sync_player_state/4,
+	handle_player_event/3, player_do/3]).
 
 %% GEN_SERVER
 -behaviour(gen_server).
@@ -57,6 +58,9 @@ sync_player_state(ClientId, Points, Badges, CurrentGame) ->
 
 handle_player_event(ClientId, EventType, EventData) ->
 	gen_server:call({global, {client, ClientId}}, {handle_player_event, EventType, EventData}).
+
+player_do(ClientPid, Action, Args) ->
+	gen_server:cast(ClientPid, {player_do, Action, Args}).
 
 
 %%% =================================================================================== %%%

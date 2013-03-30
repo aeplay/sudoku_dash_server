@@ -26,7 +26,6 @@ init(_Transport, Req, _Opts, Active) ->
 	{ok, Req, #state{active = Active}}.
 
 stream(<<"ping">>, Req, State) ->
-	io:format("ping received~n"),
 	{reply, <<"pong">>, Req, State};
 stream(Data, Req, State) ->
 	io:format("stream received ~s~n", [Data]),
@@ -58,6 +57,10 @@ handle_json([<<"register">>, [{<<"name">>, Name}, {<<"id">>, PlayerId}, {<<"secr
 
 handle_json([<<"login">>, [{<<"secret">>, Secret}], _ClientId], State) ->
 	sdd_client:login(State#state.client_pid, Secret),
+	State;
+
+handle_json([<<"find_game">>, [], _ClientId], State) ->
+	sdd_client:player_do(State#state.client_pid, find_game, whatever),
 	State.
 
 %%% =================================================================================== %%%

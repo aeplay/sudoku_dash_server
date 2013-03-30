@@ -44,4 +44,20 @@ init([]) ->
 		supervisor,
 		[sdd_players_sup]
 	},
-	{ok, {{one_for_one, 5, 10}, [ClientSupSpec, PlayerSupSpec]}}.
+	GamesManagerSpec = {
+		games_manager,
+		{sdd_games_manager, start_link, []},
+		permanent,
+		1000,
+		worker,
+		[sdd_games_manager]
+	},
+	GamesSupSpec = {
+		games_sup,
+		{sdd_games_sup, start_link, []},
+		permanent,
+		1000,
+		supervisor,
+		[sdd_games_sup]
+	},
+	{ok, {{one_for_one, 5, 10}, [ClientSupSpec, PlayerSupSpec, GamesManagerSpec, GamesSupSpec]}}.
