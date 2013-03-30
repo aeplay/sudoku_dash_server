@@ -54,6 +54,10 @@ handle_json([<<"hello">>, ClientId], State) ->
 
 handle_json([<<"register">>, [{<<"name">>, Name}, {<<"id">>, PlayerId}, {<<"secret">>, Secret}], _ClientId], State) ->
 	sdd_client:register(State#state.client_pid, PlayerId, Name, Secret),
+	State;
+
+handle_json([<<"login">>, [{<<"secret">>, Secret}], _ClientId], State) ->
+	sdd_client:login(State#state.client_pid, Secret),
 	State.
 
 %%% =================================================================================== %%%

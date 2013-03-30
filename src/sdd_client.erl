@@ -11,7 +11,7 @@
 -module(sdd_client).
 
 %% API
--export([start_link/2, add_connection/3, register/4]).
+-export([start_link/2, add_connection/3, register/4, login/2]).
 
 %% GEN_SERVER
 -behaviour(gen_server).
@@ -48,6 +48,9 @@ add_connection(ClientId, ConnectionPid, ConnectionActive) ->
 
 register(ClientPid, PlayerId, Name, Secret) ->
 	gen_server:cast(ClientPid, {register, PlayerId, Name, Secret}).
+
+login(ClientPid, Secret) ->
+	gen_server:cast(ClientPid, {login, Secret}).
 
 
 %%% =================================================================================== %%%
@@ -106,11 +109,11 @@ handle_cast({register, PlayerId, Name, Secret}, State) ->
 
 %% Tries to authenticate with a secret and connect to the given player
 
-handle_cast({login, PlayerId, Secret}, State) ->
-	case sdd_player:authenticate(PlayerId, Secret) of
-		true -> 
+handle_cast({login, Secret}, State) ->
+	case sdd_player:authenticate(Secret) of
+		{Name, PlayerId} -> 
 			sdd_player:connect(PlayerId, State#state.id, State#state.info),
-			StateAfterSend = add_message({login_ok}, State),
+			StateAfterSend = add_message({login_ok, {Name, PlayerId}}, State),
 			{noreply, StateAfterSend#state{player = PlayerId}};
 		false ->
 			StateAfterSend = add_message({login_invalid}, State),

@@ -13,7 +13,11 @@
 -module(sdd_player).
 
 %% API
--export([start_link/2, do/3, handle_game_event/4, register/3, authenticate/2, connect/3]).
+-export([start_link/2, do/3, handle_game_event/4, register/3, authenticate/1, connect/3]).
+
+%% GEN_SERVER
+-behaviour(gen_server).
+-export([init/1, handle_cast/2, handle_call/3, handle_info/2, code_change/3, terminate/2]).
 
 %% Records
 -record(state, {
@@ -31,7 +35,7 @@
 %%% =================================================================================== %%%
 
 start_link(PlayerId, History) ->
-	gen_server:start_link({global, {player, PlayerId}}, ?MODULE, [History], []).
+	gen_server:start_link({global, {player, PlayerId}}, ?MODULE, History, []).
 
 do(PlayerId, Action, Args) ->
 	gen_server:cast(PlayerId, {Action, Args}).
@@ -48,23 +52,33 @@ register(PlayerId, Name, Secret) ->
 		doesnt_exist ->
 			InitialHistory = sdd_history:new(fun realize_event/3),
 			History = sdd_history:append(InitialHistory, register, {PlayerId, Name, Secret}),
+			sdd_history:save_persisted(player_history, PlayerId, History),
 			sdd_players_sup:start_player(PlayerId, History),
 			ok;
 		_Exists -> already_exists
 	end.
 
-authenticate(PlayerId, Secret) ->
-	case sdd_history:persisted_state(player_history, PlayerId) of
-		#state{secret = Secret} -> true;
+authenticate(Secret) ->
+	case sdd_history:persisted_state_by_match(player_history, #state{
+		secret = Secret,
+		id = '_',
+		name = '_',
+		current_game = '_',
+		current_client = '_',
+		points = '_',
+		badges = '_'
+	}) of
+		State = #state{secret = Secret} -> {State#state.name, State#state.id};
 		_Else -> false
 	end.
 
 connect(PlayerId, ClientId, ClientInfo) ->
 	case global:whereis_name({player, PlayerId}) of
 		undefined ->
+			erlang:display("Loading Player"),
 			History = sdd_history:load_persisted(player_history, PlayerId, fun realize_event/3),
 			sdd_players_sup:start_player(PlayerId, History);
-		_Pid -> do_nothing
+		_Pid -> erlang:display("Player already running"), do_nothing
 	end,
 	gen_server:cast({global, {player, PlayerId}}, {connect, ClientId, ClientInfo}).
 
@@ -94,6 +108,7 @@ handle_cast({connect, ClientId, ClientInfo}, History) ->
 	end,
 	HistoryWithListener = sdd_history:add_listener(History, ListenerFunction, tell_state),
 	NewHistory = sdd_history:append(HistoryWithListener, connect, {ClientId, ClientInfo}),
+	erlang:display("Client connected"),
 	{noreply, NewHistory};
 
 %% Leaves the current game, for a reason, and notifies the game
@@ -145,6 +160,17 @@ handle_call({game_event, GameId, EventType, EventData}, _From, History) ->
 		_WrongGame ->
 			{wrong_game, History}
 	end.
+
+%% ------------------------------------------------------------------------------------- %%
+%% Rest of gen_server calls
+
+handle_info(_Info, State) ->
+	State.
+
+code_change(_OldVsn, State, _Extra) ->
+	{ok, State}.
+
+terminate(_Reason, _State) -> ok.
 
 %%% =================================================================================== %%%
 %%% HISTORY CALLBACKS                                                                   %%%

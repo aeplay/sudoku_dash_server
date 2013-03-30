@@ -12,7 +12,7 @@
 -module(sdd_history).
 
 %% API
--export([new/1, state/1, past/1, append/3, add_listener/3, setup_persistence/1, save_persisted/3, load_persisted/3, persisted_state/2]).
+-export([new/1, state/1, past/1, append/3, add_listener/3, setup_persistence/1, save_persisted/3, load_persisted/3, persisted_state/2, persisted_state_by_match/2]).
 
 %% Types and Records
 -record(history, {
@@ -131,6 +131,19 @@ persisted_state(HistoryType, Id) ->
 		{atomic, []} -> doesnt_exist;
 		{atomic, [PersistedHistory]} -> PersistedHistory#persisted_history.state
 	end.
+
+persisted_state_by_match(HistoryType, StatePattern) ->
+	case mnesia:transaction(fun() ->
+		mnesia:match_object(HistoryType, #persisted_history{
+			id = '_',
+			past = '_',
+			state = StatePattern
+		}, read)
+	end) of
+		{atomic, []} -> doesnt_exist;
+		{atomic, [PersistedHistory]} -> PersistedHistory#persisted_history.state
+	end.
+
 
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
