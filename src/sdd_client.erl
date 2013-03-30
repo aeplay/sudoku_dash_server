@@ -11,7 +11,7 @@
 -module(sdd_client).
 
 %% API
--export([start_link/2, add_connection/3, register/4, login/2]).
+-export([start_link/2, add_connection/3, register/4, login/2, sync_player_state/4, handle_player_event/3]).
 
 %% GEN_SERVER
 -behaviour(gen_server).
@@ -52,6 +52,12 @@ register(ClientPid, PlayerId, Name, Secret) ->
 login(ClientPid, Secret) ->
 	gen_server:cast(ClientPid, {login, Secret}).
 
+sync_player_state(ClientId, Points, Badges, CurrentGame) ->
+	gen_server:call({global, {client, ClientId}}, {sync_player_state, Points, Badges, CurrentGame}).
+
+handle_player_event(ClientId, EventType, EventData) ->
+	gen_server:call({global, {client, ClientId}}, {handle_player_event, EventType, EventData}).
+
 
 %%% =================================================================================== %%%
 %%% GEN_SERVER CALLBACKS                                                                %%%
@@ -81,6 +87,13 @@ handle_call({handle_player_event, EventType, EventData}, _From, State) ->
 		_OtherEvent ->
 			StateAfterForward
 	end,
+	{reply, continue_listening, NewState};
+
+%% Syncs player state with client, updates our own current_game field
+
+handle_call({sync_player_state, Points, Badges, CurrentGame}, _From, State) ->
+	StateAfterForward = add_message({sync_player_state, Points, Badges, CurrentGame}, State),
+	NewState = StateAfterForward#state{current_game = CurrentGame},
 	{reply, continue_listening, NewState}.
 
 %% ------------------------------------------------------------------------------------- %%
@@ -134,14 +147,7 @@ handle_cast({game_do, Action, Args}, State) ->
 		{_, undefined} -> do_nothing;
 		{PlayerId, GameId} -> sdd_game:do(GameId, PlayerId, Action, Args)
 	end,
-	{noreply, State};
-
-%% Syncs player state with client, updates our own current_game field
-
-handle_cast({sync_player_state, Points, Badges, CurrentGame}, State) ->
-	StateAfterForward = add_message({sync_player_state, Points, Badges, CurrentGame}, State),
-	NewState = StateAfterForward#state{current_game = CurrentGame},
-	{noreply, NewState}.
+	{noreply, State}.
 
 %%% =================================================================================== %%%
 %%% UTILITY FUNCTION                                                                    %%%
