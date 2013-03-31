@@ -9,7 +9,7 @@
 -module(sdd_games_manager).
 
 %% API
--export([start_link/0, find_game_and_join/3, rejoin/2, leave/3, remove_game/1]).
+-export([start_link/0, find_game_and_join/4, leave/3, remove_game/1]).
 
 %% GEN_SERVER
 -behaviour(gen_server).
@@ -33,11 +33,8 @@
 start_link() ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-find_game_and_join(PlayerId, _Options, CurrentGame) ->
-	gen_server:cast(?MODULE, {find_game_and_join, PlayerId, CurrentGame}).
-
-rejoin(PlayerId, GameId) ->
-	gen_server:cast(?MODULE, {rejoin, PlayerId, GameId}).
+find_game_and_join(PlayerId, PlayerInfo, _Options, CurrentGame) ->
+	gen_server:cast(?MODULE, {find_game_and_join, PlayerId, PlayerInfo, CurrentGame}).
 
 leave(PlayerId, GameId, Reason) ->
 	gen_server:cast(?MODULE, {leave, PlayerId, GameId, Reason}).
@@ -52,9 +49,9 @@ remove_game(GameId) ->
 init(_Opts) ->
 	{ok, #state{}}.
 
-handle_cast({find_game_and_join, PlayerId, CurrentGame}, State) ->
+handle_cast({find_game_and_join, PlayerId, PlayerInfo, CurrentGame}, State) ->
 	StateAfterLeave = leave(PlayerId, CurrentGame, rejoin, State),
-	StateAfterJoin = case join(PlayerId, CurrentGame, rejoin, StateAfterLeave) of
+	StateAfterJoin = case join(PlayerId, PlayerInfo, CurrentGame, rejoin, StateAfterLeave) of
 		{true, StateAfterReJoin} -> StateAfterReJoin;
 		{false, _} ->
 			OpenGames = lists:filter(fun({_GameId, NPlayers}) -> NPlayers < ?MAX_PLAYERS_PER_GAME end, StateAfterLeave#state.games),
@@ -63,7 +60,7 @@ handle_cast({find_game_and_join, PlayerId, CurrentGame}, State) ->
 				[{Game, _NPlayers} | _] -> {Game, StateAfterLeave};
 				[] -> create_game(StateAfterLeave)
 			end,
-			{_Result, StateAfterNewJoin} = join(PlayerId, GameToJoin, random, NewState),
+			{_Result, StateAfterNewJoin} = join(PlayerId, PlayerInfo, GameToJoin, random, NewState),
 			StateAfterNewJoin
 	end,
 	{noreply, StateAfterJoin};
@@ -73,14 +70,6 @@ handle_cast({find_game_and_join, PlayerId, CurrentGame}, State) ->
 
 handle_cast({leave, PlayerId, GameId, Reason}, State) ->
 	{noreply, leave(PlayerId, GameId, Reason, State)};
-
-%% ------------------------------------------------------------------------------------- %%
-%% Removes a player from a game and decreases the according player counter
-
-handle_cast({rejoin, PlayerId, GameId}, State) ->
-	StateAfterLeave = leave(PlayerId, GameId, rejoin, State),
-	{_Result, StateAfterJoin} = join(PlayerId, GameId, rejoin, StateAfterLeave),
-	{noreply, StateAfterJoin};
 
 %% ------------------------------------------------------------------------------------- %%
 %% Removes a game from the list
@@ -116,7 +105,7 @@ create_game(State) ->
 	NewGames = [{GameId, 0}|Games],
 	{GameId, State#state{games = NewGames}}.
 
-join(PlayerId, GameId, Source, State) ->
+join(PlayerId, PlayerInfo, GameId, Source, State) ->
 	case lists:keyfind(GameId, 1, State#state.games) of
 		false -> {false, State};
 		{GameId, OldPlayerCount} ->
@@ -125,7 +114,7 @@ join(PlayerId, GameId, Source, State) ->
 					{false, State};
 				true ->
 					sdd_player:do(PlayerId, join, {GameId, Source}),
-					case sdd_game:join(GameId, PlayerId, Source) of
+					case sdd_game:join(GameId, PlayerId, PlayerInfo, Source) of
 						ok ->
 							NewGames = lists:keyreplace(GameId, 1, State#state.games, {GameId, OldPlayerCount + 1}),
 							{true, State#state{games = NewGames}};

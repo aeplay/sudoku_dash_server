@@ -13,6 +13,8 @@ start() ->
 	ok = application:start(sdd).
 
 setup_persistence() ->
+	application:set_env(mnesia, dir, "./db"),
 	mnesia:create_schema([node()]),
 	application:start(mnesia),
-	sdd_history:setup_persistence(player_history).
+	sdd_history:setup_persistence(player_history),
+	sdd_history:setup_persistence(game_history).

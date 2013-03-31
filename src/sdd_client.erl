@@ -11,7 +11,7 @@
 -module(sdd_client).
 
 %% API
--export([start_link/2, add_connection/3, heartbeat/1, register/4, login/2, sync_player_state/4,
+-export([start_link/2, add_connection/3, heartbeat/1, other_client_connected/1, register/4, login/2, sync_player_state/4,
 	handle_player_event/3, player_do/3, game_do/3, handle_game_event/5]).
 
 %% GEN_SERVER
@@ -53,6 +53,9 @@ add_connection(ClientId, ConnectionPid, ConnectionActive) ->
 
 heartbeat(ClientPid) ->
 	gen_server:cast(ClientPid, heartbeat).
+
+other_client_connected(ClientId) ->
+	gen_server:cast({global, {client, ClientId}}, other_client_connected).
 
 register(ClientPid, PlayerId, Name, Secret) ->
 	gen_server:cast(ClientPid, {register, PlayerId, Name, Secret}).
@@ -129,6 +132,10 @@ handle_cast({add_connection, ConnectionPid, ConnectionActive}, State) ->
 
 handle_cast(heartbeat, State) ->
 	{noreply, State#state{connection_last_heartbeat = now()}};
+
+handle_cast(other_client_connected, State) ->
+	StateAfterSend = add_message({other_client_connected}, State),
+	{stop, normal, StateAfterSend};
 
 %% Tries to register a player and connect to it
 

@@ -30,6 +30,12 @@
 	badges = []
 }).
 
+-record(player_info, {
+	name,
+	points,
+	badges
+}).
+
 %%% =================================================================================== %%%
 %%% API                                                                                 %%%
 %%% =================================================================================== %%%
@@ -48,8 +54,9 @@ register(PlayerId, Name, Secret) ->
 		doesnt_exist ->
 			InitialHistory = sdd_history:new(fun realize_event/3),
 			History = sdd_history:append(InitialHistory, register, {PlayerId, Name, Secret}),
-			sdd_history:save_persisted(player_history, PlayerId, History),
-			sdd_players_sup:start_player(PlayerId, History),
+			HistoryWithBadge = sdd_history:append(History, get_badge, {<<"&alpha;">>,<<"Alpha Tester">>}),
+			sdd_history:save_persisted(player_history, PlayerId, HistoryWithBadge),
+			sdd_players_sup:start_player(PlayerId, HistoryWithBadge),
 			ok;
 		_Exists -> already_exists
 	end.
@@ -95,6 +102,12 @@ init(InitialHistory) ->
 %% Connects a new client
 
 handle_cast({connect, ClientId, ClientInfo}, History) ->
+	State = sdd_history:state(History),
+	case State#state.current_client of
+		undefined -> do_nothing;
+		OldClient -> sdd_client:other_client_connected(OldClient)
+	end,
+
 	ListenerFunction = fun
 		(state, PlayerState) ->
 			sdd_client:sync_player_state(
@@ -131,7 +144,12 @@ handle_cast({disconnect, ClientId}, History) ->
 
 handle_cast({find_game, Options}, History) ->
 	State = sdd_history:state(History),
-	sdd_games_manager:find_game_and_join(State#state.id, Options, State#state.current_game),
+	PlayerInfo = #player_info{
+		name = State#state.name,
+		points = State#state.points,
+		badges = State#state.badges
+	},
+	sdd_games_manager:find_game_and_join(State#state.id, PlayerInfo, Options, State#state.current_game),
 	{noreply, History};
 
 %% Leaves the current game, for a reason, and notifies the game
@@ -180,6 +198,11 @@ handle_call({handle_game_event, GameId, Time, EventType, EventData}, _From, Hist
 			{reply, wrong_game, History}
 	end.
 
+terminate(_Reason, History) ->
+	State = sdd_history:state(History),
+	sdd_history:save_persisted(player_history, State#state.id, History),
+	ok.
+
 %% ------------------------------------------------------------------------------------- %%
 %% Rest of gen_server calls
 
@@ -188,8 +211,6 @@ handle_info(_Info, State) ->
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
-
-terminate(_Reason, _State) -> ok.
 
 %%% =================================================================================== %%%
 %%% HISTORY CALLBACKS                                                                   %%%

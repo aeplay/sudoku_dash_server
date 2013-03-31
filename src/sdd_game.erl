@@ -12,7 +12,7 @@
 -module(sdd_game).
 
 %% API
--export([start_link/1, join/3, do/4]).
+-export([start_link/1, join/4, do/4]).
 
 %% GEN_SERVER
 -behaviour(gen_server).
@@ -44,8 +44,8 @@
 start_link(Id) ->
 	gen_server:start_link({global, {game, Id}}, ?MODULE, Id, []).
 
-join(GameId, PlayerId, Source) ->
-	gen_server:call({global, {game, GameId}}, {join, PlayerId, Source}).
+join(GameId, PlayerId, PlayerInfo, Source) ->
+	gen_server:call({global, {game, GameId}}, {join, PlayerId, PlayerInfo, Source}).
 
 do(GameId, PlayerId, Action, Args) ->
 	gen_server:cast({global, {game, GameId}}, {Action, PlayerId, Args}).
@@ -67,13 +67,13 @@ init(Id) ->
 %% ------------------------------------------------------------------------------------- %%
 %% Adds a player to the game (if it's not full), by creating an listener function
 
-handle_call({join, PlayerId, Source}, _From, History) ->
+handle_call({join, PlayerId, PlayerInfo, Source}, _From, History) ->
 	State = sdd_history:state(History),
 	ListenerFunction = fun(event, {Time, EventType, EventData}) ->
 		sdd_player:handle_game_event(PlayerId, State#state.id, Time, EventType, EventData)
 	end,
 	HistoryWithNewListener = sdd_history:add_listener(History, ListenerFunction, replay_past),
-	NewHistory = sdd_history:append(HistoryWithNewListener, join, {PlayerId, Source}),
+	NewHistory = sdd_history:append(HistoryWithNewListener, join, {PlayerId, PlayerInfo, Source}),
 	{reply, ok, NewHistory}.
 
 %% ------------------------------------------------------------------------------------- %%
@@ -117,13 +117,18 @@ handle_cast({guess, PlayerId, {Position, Number}}, History) ->
 handle_info(stop_complete, History) ->
 	{stop, normal, History}.
 
+terminate(_Reason, History) ->
+	State = sdd_history:state(History),
+	sdd_history:save_persisted(game_history, State#state.id, History),
+	ok.
+
 %% ------------------------------------------------------------------------------------- %%
 %% Rest of gen_server calls
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(_Reason, _State) -> ok.
+
 
 %%% =================================================================================== %%%
 %%% HISTORY CALLBACKS                                                                   %%%
@@ -145,7 +150,11 @@ realize_event(State, guess, {PlayerId, Position, Number, {good}}) ->
 	Complete = sdd_logic:is_complete(NewBoard),
 	State#state{board = NewBoard, candidates = NewCandidates, complete = Complete};
 
-%% Does not change state for guesses that are not good
+realize_event(State, guess, {PlayerId, _Position, _Number, {bad, _Conflicts}}) ->
+	sdd_player:do(PlayerId, get_points, -1),
+	State;
+
+%% Does not change state for other guesses
 
 realize_event(State, guess, {_, _, _, _}) -> State;
 
