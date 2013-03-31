@@ -100,8 +100,10 @@ handle_cast({guess, PlayerId, {Position, Number}}, History) ->
 			Result = sdd_logic:check_guess(Position, Number, Board, Candidates),
 			GuessEventData = {PlayerId, Position, Number, Result},
 			NewHistory = sdd_history:append(History, guess, GuessEventData),
-			case sdd_history:state(NewHistory) of
+			NewState = sdd_history:state(NewHistory),
+			case NewState of
 				#state{complete = true} ->
+					sdd_games_manager:remove_game(NewState#state.id),
 					erlang:send_after(?TIMEOUT_AFTER_COMPLETE, self(), stop_complete),
 					{noreply, NewHistory};
 				#state{complete = false} ->
@@ -113,7 +115,7 @@ handle_cast({guess, PlayerId, {Position, Number}}, History) ->
 %% Stops a game if it is complete
 
 handle_info(stop_complete, History) ->
-	{stop, complete, History}.
+	{stop, normal, History}.
 
 %% ------------------------------------------------------------------------------------- %%
 %% Rest of gen_server calls

@@ -13,7 +13,7 @@
 -module(sdd_player).
 
 %% API
--export([start_link/2, do/3, handle_game_event/5, register/3, authenticate/1, connect/3]).
+-export([start_link/2, do/3, handle_game_event/5, register/3, authenticate/1, connect/3, disconnect/2]).
 
 %% GEN_SERVER
 -behaviour(gen_server).
@@ -41,11 +41,7 @@ do(PlayerId, Action, Args) ->
 	gen_server:cast({global, {player, PlayerId}}, {Action, Args}).
 
 handle_game_event(PlayerId, GameId, Time, EventType, EventData) ->
-	try gen_server:call({global, {player, PlayerId}}, {handle_game_event, GameId, Time, EventType, EventData}, 5000) of
-		Reply -> Reply
-	catch
-		Error -> Error
-	end.
+	catch gen_server:call({global, {player, PlayerId}}, {handle_game_event, GameId, Time, EventType, EventData}, 5000).
 
 register(PlayerId, Name, Secret) ->
 	case sdd_history:persisted_state(player_history, PlayerId) of
@@ -82,6 +78,9 @@ connect(PlayerId, ClientId, ClientInfo) ->
 	end,
 	gen_server:cast({global, {player, PlayerId}}, {connect, ClientId, ClientInfo}).
 
+disconnect(PlayerId, ClientId) ->
+	gen_server:cast({global, {player, PlayerId}}, {disconnect, ClientId}).
+
 %%% =================================================================================== %%%
 %%% GEN_SERVER CALLBACKS                                                                %%%
 %%% =================================================================================== %%%
@@ -112,14 +111,27 @@ handle_cast({connect, ClientId, ClientInfo}, History) ->
 	erlang:display("Client connected"),
 	{noreply, NewHistory};
 
+
+%% Disconnects a client, if it was the current one, stop player process
+
+handle_cast({disconnect, ClientId}, History) ->
+	State = sdd_history:state(History),
+	case State#state.current_client of
+		ClientId ->
+			case State#state.current_game of
+				undefined -> {noreply, History};
+				GameId ->
+					sdd_games_manager:leave(State#state.id, GameId, disconnect),
+					{stop, normal, History}
+			end;
+		_OtherClient -> {noreply, History}
+	end;
+
 %% Finds a game and joins it
 
 handle_cast({find_game, Options}, History) ->
 	State = sdd_history:state(History),
-	case State#state.current_game of
-		undefined -> sdd_games_manager:find_game_and_join(State#state.id, Options);
-		GameId -> sdd_games_manager:rejoin(State#state.id, GameId)
-	end,
+	sdd_games_manager:find_game_and_join(State#state.id, Options, State#state.current_game),
 	{noreply, History};
 
 %% Leaves the current game, for a reason, and notifies the game

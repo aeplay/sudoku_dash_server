@@ -541,7 +541,7 @@ generate_sudoku() ->
 
 	BoardComplete = fill_board(Board0),
 
-	remove_inferrables(BoardComplete, 3, 81).
+	remove_inferrables(BoardComplete, 3, 2).
 
 %% ------------------------------------------------------------------------------------- %%
 %% fill_board

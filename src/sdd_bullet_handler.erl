@@ -26,6 +26,10 @@ init(_Transport, Req, _Opts, Active) ->
 	{ok, Req, #state{active = Active}}.
 
 stream(<<"ping">>, Req, State) ->
+	case State#state.client_pid of
+		undefined -> do_nothing;
+		Pid -> sdd_client:heartbeat(Pid)
+	end,
 	{reply, <<"pong">>, Req, State};
 stream(Data, Req, State) ->
 	io:format("stream received ~s~n", [Data]),
@@ -69,6 +73,10 @@ handle_json([<<"chat">>, Message, _ClientId], State) ->
 
 handle_json([<<"guess">>, Position, Number, _ClientId], State) ->
 	sdd_client:game_do(State#state.client_pid, guess, {Position, Number}),
+	State;
+
+handle_json([<<"leave">>, Reason, _ClientId], State) ->
+	sdd_client:player_do(State#state.client_pid, leave, Reason),
 	State.
 
 %%% =================================================================================== %%%

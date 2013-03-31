@@ -11,7 +11,7 @@
 -module(sdd_client).
 
 %% API
--export([start_link/2, add_connection/3, register/4, login/2, sync_player_state/4,
+-export([start_link/2, add_connection/3, heartbeat/1, register/4, login/2, sync_player_state/4,
 	handle_player_event/3, player_do/3, game_do/3, handle_game_event/5]).
 
 %% GEN_SERVER
@@ -25,10 +25,14 @@
 	connection,
 	connection_active,
 	connection_can_send,
+	connection_last_heartbeat,
 	messages = [],
 	player,
 	current_game
 }).
+
+-define(MAX_HEARTBEAT_AGE, 30000).
+-define(CHECK_HEARTBEAT_INTERVAL, 10000).
 
 %%% =================================================================================== %%%
 %%% API                                                                                 %%%
@@ -47,6 +51,9 @@ add_connection(ClientId, ConnectionPid, ConnectionActive) ->
 	gen_server:cast(ClientPid, {add_connection, ConnectionPid, ConnectionActive}),
 	ClientPid.
 
+heartbeat(ClientPid) ->
+	gen_server:cast(ClientPid, heartbeat).
+
 register(ClientPid, PlayerId, Name, Secret) ->
 	gen_server:cast(ClientPid, {register, PlayerId, Name, Secret}).
 
@@ -54,10 +61,10 @@ login(ClientPid, Secret) ->
 	gen_server:cast(ClientPid, {login, Secret}).
 
 sync_player_state(ClientId, Points, Badges, CurrentGame) ->
-	gen_server:call({global, {client, ClientId}}, {sync_player_state, Points, Badges, CurrentGame}).
+	catch gen_server:call({global, {client, ClientId}}, {sync_player_state, Points, Badges, CurrentGame}).
 
 handle_player_event(ClientId, EventType, EventData) ->
-	gen_server:call({global, {client, ClientId}}, {handle_player_event, EventType, EventData}).
+	catch gen_server:call({global, {client, ClientId}}, {handle_player_event, EventType, EventData}).
 
 handle_game_event(ClientId, GameId, Time, EventType, EventData) ->
 	gen_server:cast({global, {client, ClientId}}, {handle_game_event, GameId, Time, EventType, EventData}).
@@ -79,8 +86,10 @@ game_do(ClientPid, Action, Args) ->
 init({ClientId, ClientInfo}) ->
 	InitialState = #state{
 		id = ClientId,
-		info = ClientInfo
+		info = ClientInfo,
+		connection_last_heartbeat = now()
 	},
+	timer:send_after(?CHECK_HEARTBEAT_INTERVAL, check_heartbeat),
 	{ok, InitialState}.
 
 %% ------------------------------------------------------------------------------------- %%
@@ -117,6 +126,9 @@ handle_cast({add_connection, ConnectionPid, ConnectionActive}, State) ->
 	},
 	StateAfterHelloSent = add_message({hello, connected}, NewState),
 	{noreply, StateAfterHelloSent};
+
+handle_cast(heartbeat, State) ->
+	{noreply, State#state{connection_last_heartbeat = now()}};
 
 %% Tries to register a player and connect to it
 
@@ -165,6 +177,36 @@ handle_cast({handle_game_event, GameId, Time, EventType, EventData}, State) ->
 	StateAfterSend = add_message({game_event, GameId, Time, EventType, EventData}, State),
 	{noreply, StateAfterSend}.
 
+%% check last heartbeat and terminate if it stoo long ago
+
+handle_info(check_heartbeat, State) ->
+	case State#state.connection_last_heartbeat of
+		undefined -> {stop, normal, State};
+		LastHeartbeat ->
+			case timer:now_diff(now(), LastHeartbeat) > ?MAX_HEARTBEAT_AGE*1000 of
+				true ->
+					erlang:display({"Client timed out", State#state.id}),
+					{stop, normal, State};
+				false ->
+					timer:send_after(?CHECK_HEARTBEAT_INTERVAL, check_heartbeat),
+					{noreply, State}
+			end
+	end.
+
+%% Notify player that we terminate
+
+terminate(_Reason, State) ->
+	sdd_player:disconnect(State#state.player, State#state.id),
+	ok.
+
+%% ------------------------------------------------------------------------------------- %%
+%% Rest of gen_server calls
+
+code_change(_OldVsn, State, _Extra) ->
+	{ok, State}.
+
+
+
 %%% =================================================================================== %%%
 %%% UTILITY FUNCTION                                                                    %%%
 %%% =================================================================================== %%%
@@ -181,17 +223,6 @@ add_message(Message, State) ->
 				false -> State#state{messages = [], connection_can_send = false}
 			end
 	end.
-
-%% ------------------------------------------------------------------------------------- %%
-%% Rest of gen_server calls
-
-handle_info(_Info, State) ->
-	State.
-
-code_change(_OldVsn, State, _Extra) ->
-	{ok, State}.
-
-terminate(_Reason, _State) -> ok.
 
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%
