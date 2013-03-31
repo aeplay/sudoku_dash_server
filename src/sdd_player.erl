@@ -13,7 +13,7 @@
 -module(sdd_player).
 
 %% API
--export([start_link/2, do/3, handle_game_event/4, register/3, authenticate/1, connect/3]).
+-export([start_link/2, do/3, handle_game_event/5, register/3, authenticate/1, connect/3]).
 
 %% GEN_SERVER
 -behaviour(gen_server).
@@ -40,8 +40,8 @@ start_link(PlayerId, History) ->
 do(PlayerId, Action, Args) ->
 	gen_server:cast({global, {player, PlayerId}}, {Action, Args}).
 
-handle_game_event(PlayerId, GameId, EventType, EventData) ->
-	try gen_server:call({global, {player, PlayerId}}, {handle_game_event, GameId, EventType, EventData}, 5000) of
+handle_game_event(PlayerId, GameId, Time, EventType, EventData) ->
+	try gen_server:call({global, {player, PlayerId}}, {handle_game_event, GameId, Time, EventType, EventData}, 5000) of
 		Reply -> Reply
 	catch
 		Error -> Error
@@ -108,6 +108,7 @@ handle_cast({connect, ClientId, ClientInfo}, History) ->
 	end,
 	HistoryWithListener = sdd_history:add_listener(History, ListenerFunction, tell_state),
 	NewHistory = sdd_history:append(HistoryWithListener, connect, {ClientId, ClientInfo}),
+	
 	erlang:display("Client connected"),
 	{noreply, NewHistory};
 
@@ -115,14 +116,15 @@ handle_cast({connect, ClientId, ClientInfo}, History) ->
 
 handle_cast({find_game, Options}, History) ->
 	State = sdd_history:state(History),
-	sdd_games_manager:find_game_and_join(State#state.id, Options),
+	case State#state.current_game of
+		undefined -> sdd_games_manager:find_game_and_join(State#state.id, Options);
+		GameId -> sdd_games_manager:rejoin(State#state.id, GameId)
+	end,
 	{noreply, History};
 
 %% Leaves the current game, for a reason, and notifies the game
 
 handle_cast({leave, Reason}, History) ->
-	State = sdd_history:state(History),
-	sdd_game:leave(State#state.id, State#state.current_game, Reason),
 	NewHistory = sdd_history:append(History, leave, Reason),
 	{noreply, NewHistory};
 
@@ -148,18 +150,22 @@ handle_cast({join, {GameId, Source}}, History) ->
 %% Returns continue_listening for events from our current game
 %% and redirects them to the client
 
-handle_call({handle_game_event, GameId, EventType, EventData}, _From, History) ->
+handle_call({handle_game_event, GameId, Time, EventType, EventData}, _From, History) ->
 	State = sdd_history:state(History),
 	CurrentGame = State#state.current_game,
+	MyId = State#state.id,
 	case GameId of
 		CurrentGame ->
 			case State#state.current_client of
 				undefined -> do_nothing;
-				ClientId -> sdd_client:handle_game_event(ClientId, GameId, EventType, EventData)
+				ClientId -> sdd_client:handle_game_event(ClientId, GameId, Time, EventType, EventData)
 			end,
-			{continue_listening, History};
+			case {EventType, EventData} of
+				{leave, {MyId, _Reason}} -> {reply, left, History};
+				_StillInGame -> {reply, continue_listening, History}
+			end;
 		_WrongGame ->
-			{wrong_game, History}
+			{reply, wrong_game, History}
 	end.
 
 %% ------------------------------------------------------------------------------------- %%

@@ -9,7 +9,7 @@
 -module(sdd_games_manager).
 
 %% API
--export([start_link/0, find_game_and_join/2]).
+-export([start_link/0, find_game_and_join/2, rejoin/2]).
 
 %% GEN_SERVER
 -behaviour(gen_server).
@@ -36,6 +36,9 @@ start_link() ->
 find_game_and_join(PlayerId, _Options) ->
 	gen_server:cast(?MODULE, {find_game_and_join, PlayerId}).
 
+rejoin(PlayerId, GameId) ->
+	gen_server:cast(?MODULE, {rejoin, PlayerId, GameId}).
+
 %%% =================================================================================== %%%
 %%% GEN_SERVER CALLBACKS                                                                %%%
 %%% =================================================================================== %%%
@@ -46,8 +49,8 @@ init(_Opts) ->
 handle_cast({find_game_and_join, PlayerId}, State) ->
 	OpenGames = lists:filter(fun({_GameId, NPlayers}) -> NPlayers < ?MAX_PLAYERS_PER_GAME end, State#state.games),
 	{GameToJoin, NewState} = case OpenGames of
-		[Game] -> {Game, State};
-		[Game | _] -> {Game, State};
+		[{Game, _NPlayers}] -> {Game, State};
+		[{Game, _NPlayers} | _] -> {Game, State};
 		[] -> create_game(State)
 	end,
 	StateAfterJoin = join(PlayerId, GameToJoin, random, NewState),
@@ -57,10 +60,15 @@ handle_cast({find_game_and_join, PlayerId}, State) ->
 %% Removes a player from a game and decreases the according player counter
 
 handle_cast({leave, PlayerId, GameId, Reason}, State) ->
-	sdd_game:do(GameId, PlayerId, leave, Reason),
-	{GameId, OldPlayerCount} = lists:keyfind(GameId, 1, State#state.games),
-	NewGames = lists:keyreplace(GameId, 1, State#state.games, {GameId, OldPlayerCount - 1}),
-	{noreply, State#state{games = NewGames}}.
+	{noreply, leave(PlayerId, GameId, Reason, State)};
+
+%% ------------------------------------------------------------------------------------- %%
+%% Removes a player from a game and decreases the according player counter
+
+handle_cast({rejoin, PlayerId, GameId}, State) ->
+	StateAfterLeave = leave(PlayerId, GameId, rejoin, State),
+	StateAfterJoin = join(PlayerId, GameId, rejoin, StateAfterLeave),
+	{noreply, StateAfterJoin}.
 
 %% ------------------------------------------------------------------------------------- %%
 %% Rest of gen_server calls
@@ -98,14 +106,21 @@ join(PlayerId, GameId, Source, State) ->
 			case sdd_game:join(GameId, PlayerId, Source) of
 				ok ->
 					NewGames = lists:keyreplace(GameId, 1, State#state.games, {GameId, OldPlayerCount + 1}),
-					{ok, State#state{games = NewGames}};
+					State#state{games = NewGames};
 				_Error ->
 					sdd_player:do(PlayerId, leave, join_error),
-					{_Error, State}
+					State
 			end;
 		false ->
-			{game_full, State}
+			State
 	end.
+
+leave(PlayerId, GameId, Reason, State) ->
+	sdd_player:do(PlayerId, leave, Reason),
+	sdd_game:do(GameId, PlayerId, leave, Reason),
+	{GameId, OldPlayerCount} = lists:keyfind(GameId, 1, State#state.games),
+	NewGames = lists:keyreplace(GameId, 1, State#state.games, {GameId, OldPlayerCount - 1}),
+	State#state{games = NewGames}.
 
 %%% =================================================================================== %%%
 %%% TESTS                                                                               %%%

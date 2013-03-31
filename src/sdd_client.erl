@@ -12,7 +12,7 @@
 
 %% API
 -export([start_link/2, add_connection/3, register/4, login/2, sync_player_state/4,
-	handle_player_event/3, player_do/3]).
+	handle_player_event/3, player_do/3, game_do/3, handle_game_event/5]).
 
 %% GEN_SERVER
 -behaviour(gen_server).
@@ -59,8 +59,14 @@ sync_player_state(ClientId, Points, Badges, CurrentGame) ->
 handle_player_event(ClientId, EventType, EventData) ->
 	gen_server:call({global, {client, ClientId}}, {handle_player_event, EventType, EventData}).
 
+handle_game_event(ClientId, GameId, Time, EventType, EventData) ->
+	gen_server:cast({global, {client, ClientId}}, {handle_game_event, GameId, Time, EventType, EventData}).
+
 player_do(ClientPid, Action, Args) ->
 	gen_server:cast(ClientPid, {player_do, Action, Args}).
+
+game_do(ClientPid, Action, Args) ->
+	gen_server:cast(ClientPid, {game_do, Action, Args}).
 
 
 %%% =================================================================================== %%%
@@ -151,7 +157,13 @@ handle_cast({game_do, Action, Args}, State) ->
 		{_, undefined} -> do_nothing;
 		{PlayerId, GameId} -> sdd_game:do(GameId, PlayerId, Action, Args)
 	end,
-	{noreply, State}.
+	{noreply, State};
+
+%% Forwards a game event to the connection
+
+handle_cast({handle_game_event, GameId, Time, EventType, EventData}, State) ->
+	StateAfterSend = add_message({game_event, GameId, Time, EventType, EventData}, State),
+	{noreply, StateAfterSend}.
 
 %%% =================================================================================== %%%
 %%% UTILITY FUNCTION                                                                    %%%

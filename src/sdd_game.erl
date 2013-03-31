@@ -69,8 +69,8 @@ init(Id) ->
 
 handle_call({join, PlayerId, Source}, _From, History) ->
 	State = sdd_history:state(History),
-	ListenerFunction = fun(event, {_Time, EventType, EventData}) ->
-		sdd_player:handle_game_event(PlayerId, State#state.id, EventType, EventData)
+	ListenerFunction = fun(event, {Time, EventType, EventData}) ->
+		sdd_player:handle_game_event(PlayerId, State#state.id, Time, EventType, EventData)
 	end,
 	HistoryWithNewListener = sdd_history:add_listener(History, ListenerFunction, replay_past),
 	NewHistory = sdd_history:append(HistoryWithNewListener, join, {PlayerId, Source}),
@@ -137,7 +137,7 @@ realize_event(_EmptyState, start, {Id, InitialBoard}) ->
 %% Update the board and candidates after a good guess, check if it is complete
 
 realize_event(State, guess, {PlayerId, Position, Number, {good}}) ->
-	sdd_player:get_points(PlayerId, 1),
+	sdd_player:do(PlayerId, get_points, 1),
 	NewBoard = array:set(Position, Number, State#state.board),
 	NewCandidates = sdd_logic:calculate_candidates(NewBoard, ?CANDIDATE_SOPHISTICATION),
 	Complete = sdd_logic:is_complete(NewBoard),

@@ -61,6 +61,14 @@ handle_json([<<"login">>, [{<<"secret">>, Secret}], _ClientId], State) ->
 
 handle_json([<<"find_game">>, [], _ClientId], State) ->
 	sdd_client:player_do(State#state.client_pid, find_game, whatever),
+	State;
+
+handle_json([<<"chat">>, Message, _ClientId], State) ->
+	sdd_client:game_do(State#state.client_pid, chat, Message),
+	State;
+
+handle_json([<<"guess">>, Position, Number, _ClientId], State) ->
+	sdd_client:game_do(State#state.client_pid, guess, {Position, Number}),
 	State.
 
 %%% =================================================================================== %%%
