@@ -647,7 +647,7 @@ check_guess(Pos, Num, Board, Candidates) ->
 							{ambigous, more_or_other_candidates}
 					end;
 				{false, Conflicts} ->
-					{bad, Conflicts}
+					{bad, lists:usort(Conflicts)}
 			end;
 		_AlreadyFilled ->
 			{already_filled}

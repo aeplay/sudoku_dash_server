@@ -150,13 +150,13 @@ realize_event(State, guess, {PlayerId, Position, Number, {good}}) ->
 	Complete = sdd_logic:is_complete(NewBoard),
 	State#state{board = NewBoard, candidates = NewCandidates, complete = Complete};
 
-realize_event(State, guess, {PlayerId, _Position, _Number, {bad, _Conflicts}}) ->
-	sdd_player:do(PlayerId, get_points, -1),
+realize_event(State, guess, {PlayerId, _Position, _Number, {bad, Conflicts}}) ->
+	sdd_player:do(PlayerId, get_points, -1*length(Conflicts)),
 	State;
 
-%% Does not change state for other guesses
-
-realize_event(State, guess, {_, _, _, _}) -> State;
+realize_event(State, guess, {PlayerId, _Position, _Number, {ambigous, _Reason}}) ->
+	sdd_player:do(PlayerId, get_points, -1),
+	State;
 
 %% Does not change state for all other used events
 
