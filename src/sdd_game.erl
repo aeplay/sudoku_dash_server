@@ -173,6 +173,16 @@ realize_event(State, leave, _) -> State.
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("sdd_history_test_macros.hrl").
 
+-define(meck_sdd_player,
+	meck:new(sdd_player),
+	meck:expect(sdd_player, handle_game_event, fun
+		(_, _, _, _, _) -> continue_listening
+	end),
+	meck:expect(sdd_player, do, fun
+		(_, _, _) -> ok
+	end)
+).
+
 -define(example_board, 
 	array:from_list(
 		[4,1,6,5,2,0,8,9,3,
@@ -188,14 +198,15 @@ realize_event(State, leave, _) -> State.
 ).
 
 init_returnsHistoryWithInitialBoardAndCandidates_test() ->
-	{ok, InitialHistory} = init(no_options),
+	{ok, InitialHistory} = init("GameId"),
 	State = sdd_history:state(InitialHistory),
 	?assertNot(State#state.board =:= undefined),
 	?assertNot(State#state.candidates =:= undefined),
 	?assertEqual(false, State#state.complete),
+	?assertEqual("GameId", State#state.id),
 
 	Board = State#state.board,
-	?history_assert_past_matches(InitialHistory, [{_Time, start, Board}]).
+	?history_assert_past_matches(InitialHistory, [{_Time, start, {"GameId", Board}}]).
 
 chat_addsChatMessageToHistory_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
@@ -204,36 +215,35 @@ chat_addsChatMessageToHistory_test() ->
 
 join_createsJoinEvent_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
-	InitialHistory = sdd_history:append(DummyHistory, start, ?example_board),
-	meck:new(sdd_player),
-	meck:expect(sdd_player, handle_game_event, fun(_, _, _) -> continue_listening end),
+	InitialHistory = sdd_history:append(DummyHistory, start, {"GameId", ?example_board}),
+	
+	?meck_sdd_player,
 
-	{reply, ok, HistoryAfterJoin} = handle_call({join, "Peter", random}, from, InitialHistory),
-	?history_assert_past_matches(HistoryAfterJoin, [{_Time, join, {"Peter", random}} | _]),
+	{reply, ok, HistoryAfterJoin} = handle_call({join, "Peter", "PeterInfo", random}, from, InitialHistory),
+	?history_assert_past_matches(HistoryAfterJoin, [{_Time, join, {"Peter", "PeterInfo", random}} | _]),
 
 	meck:unload(sdd_player).
 
 join_addsPlayerListenerFunctionToHistory_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
-	InitialHistory = sdd_history:append(DummyHistory, start, ?example_board),
-	meck:new(sdd_player),
-	meck:expect(sdd_player, handle_game_event, fun(_, _, _) -> continue_listening end),
+	InitialHistory = sdd_history:append(DummyHistory, start, {"GameId", ?example_board}),
+	
+	?meck_sdd_player,
 
-	{reply, ok, _HistoryAfterJoin} = handle_call({join, "Peter", random}, from, InitialHistory),
-	?assert(meck:called(sdd_player, handle_game_event, ["Peter", start, '_'])),
-	?assert(meck:called(sdd_player, handle_game_event, ["Peter", join, {"Peter", random}])),
+	{reply, ok, _HistoryAfterJoin} = handle_call({join, "Peter", "PeterInfo", random}, from, InitialHistory),
+	?assert(meck:called(sdd_player, handle_game_event, ["Peter", "GameId", '_', start, '_'])),
+	?assert(meck:called(sdd_player, handle_game_event, ["Peter", "GameId", '_', join, {"Peter", "PeterInfo", random}])),
 
 	?assert(meck:validate(sdd_player)),
 	meck:unload(sdd_player).
 
 leave_createsLeaveEvent_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
-	InitialHistory = sdd_history:append(DummyHistory, start, ?example_board),
+	InitialHistory = sdd_history:append(DummyHistory, start, {"GameId", ?example_board}),
 
-	meck:new(sdd_player),
-	meck:expect(sdd_player, handle_game_event, fun(_, _, _) -> continue_listening end),
+	?meck_sdd_player,
 
-	{reply, ok, HistoryAfterJoin} = handle_call({join, "Peter", random}, from, InitialHistory),
+	{reply, ok, HistoryAfterJoin} = handle_call({join, "Peter", "PeterInfo", random}, from, InitialHistory),
 	{noreply, HistoryAfterLeave} = handle_cast({leave, "Peter", fell_asleep}, HistoryAfterJoin),
 	meck:unload(sdd_player),
 
@@ -252,16 +262,13 @@ guess_updatesBoardOnCorrectGuessAndGivesPlayerAPoint_test() ->
 		 9,2,4,6,7,3,5,1,8]
 	),
 	DummyHistory = sdd_history:new(fun realize_event/3),
-	InitialHistory = sdd_history:append(DummyHistory, start, InitialBoard),
+	InitialHistory = sdd_history:append(DummyHistory, start, {"GameId", InitialBoard}),
 
-	meck:new(sdd_player),
-	meck:expect(sdd_player, get_points, fun
-		(_PlayerId, _Increase) -> ok
-	end),
+	?meck_sdd_player,
 
 	{noreply, HistoryAfterGuess} = handle_cast({guess, "Peter", {27, 1}}, InitialHistory),
 
-	?assert(meck:called(sdd_player, get_points, ["Peter", 1])),
+	?assert(meck:called(sdd_player, do, ["Peter", get_points, 1])),
 	?assert(meck:validate(sdd_player)),
 	meck:unload(sdd_player),
 	
@@ -283,7 +290,7 @@ guess_addsGuessToHistoryButLeavesBoardAloneOnInvalidGuess_test() ->
 		 9,2,4,6,7,3,5,1,8]
 	),
 	DummyHistory = sdd_history:new(fun realize_event/3),
-	InitialHistory = sdd_history:append(DummyHistory, start, InitialBoard),
+	InitialHistory = sdd_history:append(DummyHistory, start, {"GameId", InitialBoard}),
 
 	{noreply, HistoryAfterGuess} = handle_cast({guess, "Peter", {27, 3}}, InitialHistory),
 	?history_assert_past_matches(HistoryAfterGuess, [{_Time, guess, {"Peter", 27, 3, {bad, _Conflicts}}} | _ ]),
@@ -303,12 +310,9 @@ guess_markGameAsCompleteAndTimeoutIfComplete_test() ->
 	),
 
 	DummyHistory = sdd_history:new(fun realize_event/3),
-	InitialHistory = sdd_history:append(DummyHistory, start, InitialBoard),
+	InitialHistory = sdd_history:append(DummyHistory, start, {"GameId", InitialBoard}),
 
-	meck:new(sdd_player),
-	meck:expect(sdd_player, get_points, fun
-		(_PlayerId, _Increase) -> ok
-	end),
+	?meck_sdd_player,
 
 	{noreply, HistoryAfterGuess} = handle_cast({guess, "Peter", {27, 1}}, InitialHistory),
 
@@ -338,12 +342,9 @@ guess_ignoresGuessAfterComplete_test() ->
 	),
 
 	DummyHistory = sdd_history:new(fun realize_event/3),
-	InitialHistory = sdd_history:append(DummyHistory, start, InitialBoard),
+	InitialHistory = sdd_history:append(DummyHistory, start, {"GameId", InitialBoard}),
 
-	meck:new(sdd_player),
-	meck:expect(sdd_player, get_points, fun
-		(_PlayerId, _Increase) -> ok
-	end),
+	?meck_sdd_player,
 
 	{noreply, HistoryAfterCompletingGuess} = handle_cast({guess, "Peter", {27, 1}}, InitialHistory),
 
@@ -353,6 +354,6 @@ guess_ignoresGuessAfterComplete_test() ->
 	?assertEqual(HistoryAfterCompletingGuess, HistoryAfterNewGuess).
 
 game_stopsWhenRecievingCompleteTimeout_test() ->
-	?assertEqual({stop, complete, dummy_history}, handle_info(stop_complete, dummy_history)).
+	?assertEqual({stop, normal, dummy_history}, handle_info(stop_complete, dummy_history)).
 
 -endif.

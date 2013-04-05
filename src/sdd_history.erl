@@ -252,12 +252,12 @@ setup_persistence_createsMnesiaTables_test() ->
 
 	setup_persistence(history_type),
 
-	?assert(meck:called(mnesia, create_table, [history_type,
-		[
-			{attributes, record_info(fields, persisted_history)},
-			{index, [id]},
-			{disc_copies, [node()]}
-		]
+	?assert(meck:called(mnesia, create_table, [history_type, 
+	[
+		{attributes, record_info(fields, persisted_history)},
+		{record_name, persisted_history},
+		{disc_copies, [node()]}
+	]
 	])),
 	?assert(meck:validate(mnesia)),
 	meck:unload(mnesia).

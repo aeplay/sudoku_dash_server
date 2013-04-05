@@ -121,7 +121,6 @@ handle_cast({connect, ClientId, ClientInfo}, History) ->
 	HistoryWithListener = sdd_history:add_listener(History, ListenerFunction, tell_state),
 	NewHistory = sdd_history:append(HistoryWithListener, connect, {ClientId, ClientInfo}),
 	
-	erlang:display("Client connected"),
 	{noreply, NewHistory};
 
 
@@ -265,89 +264,46 @@ init_createsPlayerProcessWithAHistory_test() ->
 	{ok, InitialHistory} = init(dummy_history),
 	?assertEqual(InitialHistory, dummy_history).
 
--define(meck_sdd_game_join,
-	meck:new(sdd_game),
-	meck:expect(sdd_game, join, fun
-		(_, "GoodGame", _) -> ok;
-		(_, "BadGame", _) -> nope
-	end)
-).
-
-join_notifiesGameWeWantToJoinAndSavesGameAsCurrentGameIfSuccessful_test() ->
-	?meck_sdd_game_join,
+join_setsGameAsCurrentGame_test() ->
 
 	InitialHistory = ?init_peter,
 
-	{reply, nope, HistoryAfterBadJoin} = handle_call({join, {"BadGame", random}}, from, InitialHistory),
-	?assertEqual(HistoryAfterBadJoin, InitialHistory),
+	{noreply, HistoryAfterGoodJoin} = handle_cast({join, {"GameId", invite}}, InitialHistory),
 
-	?assert(meck:called(sdd_game, join, ["Peter", "BadGame", random])),
-
-	{reply, ok, HistoryAfterGoodJoin} = handle_call({join, {"GoodGame", invite}}, from, InitialHistory),
-
-	?assert(meck:called(sdd_game, join, ["Peter", "GoodGame", invite])),
-	?assert(meck:validate(sdd_game)),
-	meck:unload(sdd_game),
-
-	?history_assert_state_field_equals(HistoryAfterGoodJoin, current_game, "GoodGame"),
-	?history_assert_past_matches(HistoryAfterGoodJoin, [{_Time, join, {"GoodGame", invite}} | _ ]).
+	?history_assert_state_field_equals(HistoryAfterGoodJoin, current_game, "GameId"),
+	?history_assert_past_matches(HistoryAfterGoodJoin, [{_Time, join, {"GameId", invite}} | _ ]).
 
 -define(init_peter_and_join_good_game,
 	fun () ->
 		InitialHistory = ?init_peter,
-		handle_call({join, {"GoodGame", invite}}, from, InitialHistory)
+		handle_cast({join, {"GoodGame", invite}}, InitialHistory)
 	end ()
 ).
 
 leave_resetsCurrentGame_test() ->
-	?meck_sdd_game_join,
-	{reply, ok, HistoryAfterGoodJoin} = ?init_peter_and_join_good_game,
-
-	meck:expect(sdd_game, leave, fun
-		("Peter", "GoodGame", timeout) -> ok
-	end),
+	{noreply, HistoryAfterGoodJoin} = ?init_peter_and_join_good_game,
 
 	{noreply, HistoryAfterLeaving} = handle_cast({leave, timeout}, HistoryAfterGoodJoin),
-
-	?assert(meck:called(sdd_game, leave, ["Peter", "GoodGame", timeout])),
-	meck:unload(sdd_game),
 	
 	?history_assert_state_field_equals(HistoryAfterLeaving, current_game, undefined),
 	?history_assert_past_matches(HistoryAfterLeaving, [{_Time, leave, timeout} | _ ]).
 
-leave_notifiesGameThatWeLeft_test() ->	
-	?meck_sdd_game_join,
-	{reply, ok, HistoryAfterGoodJoin} = ?init_peter_and_join_good_game,
-
-	meck:expect(sdd_game, leave, fun
-		("Peter", "GoodGame", timeout) -> ok
-	end),
-
-	{noreply, _} = handle_cast({leave, timeout}, HistoryAfterGoodJoin),
-
-	?assert(meck:called(sdd_game, leave, '_')),
-	?assert(meck:validate(sdd_game)),
-	meck:unload(sdd_game).
-
 handle_game_event_continuesListeningOnlyIfEventWasFromCurrentGame_test() ->
-	?meck_sdd_game_join,
-	{reply, ok, HistoryAfterGoodJoin} = ?init_peter_and_join_good_game,
-
-	meck:unload(sdd_game),
+	{noreply, HistoryAfterGoodJoin} = ?init_peter_and_join_good_game,
 
 	?assertMatch(
-		{continue_listening, _NewHistory},
-		handle_call({game_event, "GoodGame", some_event, some_data}, from, HistoryAfterGoodJoin)
+		{reply, continue_listening, _NewHistory},
+		handle_call({handle_game_event, "GoodGame", some_time, some_event, some_data}, from, HistoryAfterGoodJoin)
 	),
 	?assertMatch(
-		{wrong_game, _NewHistory},
-		handle_call({game_event, "OtherGame", some_event, some_data}, from, HistoryAfterGoodJoin)
+		{reply, wrong_game, _NewHistory},
+		handle_call({handle_game_event, "OtherGame", some_time, some_event, some_data}, from, HistoryAfterGoodJoin)
 	).
 
 -define(meck_sdd_client, 
 	meck:new(sdd_client),
 	meck:expect(sdd_client, handle_game_event, fun
-		(_ClientId, _GameId, _EventType, _EventData) -> ok
+		(_ClientId, _GameId, _Time, _EventType, _EventData) -> ok
 	end),
 	meck:expect(sdd_client, handle_player_event, fun
 		(_ClientId, _EventType, _EventData) -> ok
@@ -358,22 +314,19 @@ handle_game_event_continuesListeningOnlyIfEventWasFromCurrentGame_test() ->
 ).	
 
 handle_game_event_redirectsToCurrentClientIfExistsAndIfEventWasFromCurrentGame_test() ->
-	?meck_sdd_game_join,
-	{reply, ok, HistoryAfterGoodJoin} = ?init_peter_and_join_good_game,
-
-	meck:unload(sdd_game),
+	{noreply, HistoryAfterGoodJoin} = ?init_peter_and_join_good_game,
 
 	%% Nothing should happen when event comes from wrong game, otherwise undef will be thrown here
-	handle_call({game_event, "BadGame", some_event, some_data}, from, HistoryAfterGoodJoin),
+	handle_call({handle_game_event, "BadGame", some_time, some_event, some_data}, from, HistoryAfterGoodJoin),
 
 	%% Nothing should happen with no client, otherwise undef will be thrown here
-	handle_call({game_event, "GoodGame", some_event, some_data}, from, HistoryAfterGoodJoin),
+	handle_call({handle_game_event, "GoodGame", some_time, some_event, some_data}, from, HistoryAfterGoodJoin),
 
 	?meck_sdd_client,
 
 	{noreply, HistoryAfterConnect} = handle_cast({connect, "ClientA", "ClientAInfo"}, HistoryAfterGoodJoin),
-	handle_call({game_event, "GoodGame", some_event, some_data}, from, HistoryAfterConnect),
-	?assert(meck:called(sdd_client, handle_game_event, ["ClientA", "GoodGame", some_event, some_data])),
+	handle_call({handle_game_event, "GoodGame", some_time, some_event, some_data}, from, HistoryAfterConnect),
+	?assert(meck:called(sdd_client, handle_game_event, ["ClientA", "GoodGame", some_time, some_event, some_data])),
 	?assert(meck:validate(sdd_client)),
 	meck:unload(sdd_client).
 

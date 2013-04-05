@@ -146,73 +146,86 @@ leave(PlayerId, GameId, Reason, State) ->
 -define(meck_sdd_game,
 	meck:new(sdd_game),
 	meck:sequence(sdd_game, start_link, 1, ["GameA", "GameB", "GameC"]),
+	meck:expect(sdd_game, join, fun
+		(_GameId, "Paul", _PlayerInfo, _Source) -> nope;
+		(_GameId, _PlayerId, _PlayerInfo, _Source) -> ok
+	end),
 	meck:expect(sdd_game, do, fun
-		(_GameId, "Paul", _Action, _Args) -> nope;
-		(_GameId, _PlayerId, _Action, _Args) -> ok
+		(_, _, _, _) -> ok
 	end)
 ).
 
+-define(meck_sdd_games_sup,
+	meck:new(sdd_games_sup),
+	meck:expect(sdd_games_sup, start_game, fun(_GameId) -> ok end)
+).
+
 create_game_startsGameAndRegistersIt_test() ->
-	?meck_sdd_game,
+	?meck_sdd_games_sup,
 
 	InitialState = #state{},
 	{GameId, NewState} = create_game(InitialState),
 
-	?assert(meck:called(sdd_game, start_link, [no_options])),
-	?assert(meck:validate(sdd_game)),
-	meck:unload(sdd_game),
+	?assert(meck:called(sdd_games_sup, start_game, '_')),
+	?assert(meck:validate(sdd_games_sup)),
+	meck:unload(sdd_games_sup),
 
-	?assertEqual("GameA", GameId),
-	?assertEqual({"GameA", 0}, lists:keyfind("GameA", 1, NewState#state.games)).
+	?assertEqual({GameId, 0}, lists:keyfind(GameId, 1, NewState#state.games)).
 
 join_joinsPlayerToGameAndIncreasesPlayerCountIfSuccessful_test() ->
 	?meck_sdd_game,
+	?meck_sdd_games_sup,
 	{GameId, InitialState} = create_game(#state{}),
 
-	{BadResult, StateAfterBadJoin} = join("Paul", GameId, random, InitialState),
+	{BadResult, StateAfterBadJoin} = join("Paul", "PaulInfo", GameId, random, InitialState),
 
-	?assert(meck:called(sdd_game, do, [GameId, "Paul", join, random])),
+	?assert(meck:called(sdd_game, join, [GameId, "Paul", "PaulInfo", random])),
 
-	?assertEqual(nope, BadResult),
-	?assertEqual({"GameA", 0}, lists:keyfind("GameA", 1, StateAfterBadJoin#state.games)),
+	?assertEqual(false, BadResult),
+	?assertEqual({GameId, 0}, lists:keyfind(GameId, 1, StateAfterBadJoin#state.games)),
 
-	{GoodResult, StateAfterGoodJoin} = join("Peter", GameId, random, InitialState),
+	{GoodResult, StateAfterGoodJoin} = join("Peter", "PeterInfo", GameId, random, InitialState),
 
-	?assert(meck:called(sdd_game, do, [GameId, "Peter", join, random])),
+	?assert(meck:called(sdd_game, join, [GameId, "Peter", "PeterInfo", random])),
 
-	?assertEqual(ok, GoodResult),
-	?assertEqual({"GameA", 1}, lists:keyfind("GameA", 1, StateAfterGoodJoin#state.games)),
+	?assertEqual(true, GoodResult),
+	?assertEqual({GameId, 1}, lists:keyfind(GameId, 1, StateAfterGoodJoin#state.games)),
 
 	?assert(meck:validate(sdd_game)),
-	meck:unload(sdd_game).
+	meck:unload(sdd_game),
+	meck:unload(sdd_games_sup).
 
 join_failsIfGameIsFull_test() ->
 	?meck_sdd_game,
+	?meck_sdd_games_sup,
 	{GameId, InitialState} = create_game(#state{}),
 
-	{ok, StateAfterFirstJoin} = join("Peter", GameId, random, InitialState),
-	{ok, StateAfterSecondJoin} = join("Petra", GameId, random, StateAfterFirstJoin),
-	{ResultWhenFull, StateAfterThirdJoin} = join("Petrus", GameId, random, StateAfterSecondJoin),
+	{true, StateAfterFirstJoin} = join("Peter", "PeterInfo", GameId, random, InitialState),
+	{true, StateAfterSecondJoin} = join("Petra", "PetraInfo", GameId, random, StateAfterFirstJoin),
+	{ResultWhenFull, StateAfterThirdJoin} = join("Petrus", "PetrusInfo", GameId, random, StateAfterSecondJoin),
 
-	?assertNot(meck:called(sdd_game, do, [GameId, "Petrus", join, random])),
+	?assertNot(meck:called(sdd_game, join, [GameId, "Petrus", "PetrusInfo", random])),
 
-	?assertEqual(game_full, ResultWhenFull),
-	?assertEqual({"GameA", 2}, lists:keyfind("GameA", 1, StateAfterThirdJoin#state.games)),
+	?assertEqual(false, ResultWhenFull),
+	?assertEqual({GameId, 2}, lists:keyfind(GameId, 1, StateAfterThirdJoin#state.games)),
 
 	?assert(meck:validate(sdd_game)),
-	meck:unload(sdd_game).
+	meck:unload(sdd_game),
+	meck:unload(sdd_games_sup).
 
 leave_removesPlayerFromGameAndDecreasesPlayerCount_test() ->
 	?meck_sdd_game,
+	?meck_sdd_games_sup,
 	{GameId, InitialState} = create_game(#state{}),
-	{ok, StateAfterJoin} = join("Peter", GameId, random, InitialState),
+	{true, StateAfterJoin} = join("Peter", "PeterInfo", GameId, random, InitialState),
 
 	{noreply, StateAfterLeave} = handle_cast({leave, "Peter", GameId, fell_asleep}, StateAfterJoin),
 
 	?assert(meck:called(sdd_game, do, [GameId, "Peter", leave, fell_asleep])),
-	?assertEqual({"GameA", 0}, lists:keyfind("GameA", 1, StateAfterLeave#state.games)),
+	?assertEqual({GameId, 0}, lists:keyfind(GameId, 1, StateAfterLeave#state.games)),
 
 	?assert(meck:validate(sdd_game)),
-	meck:unload(sdd_game).
+	meck:unload(sdd_game),
+	meck:unload(sdd_games_sup).
 
 -endif.

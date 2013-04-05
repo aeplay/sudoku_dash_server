@@ -159,7 +159,7 @@ handle_cast({login, Secret}, State) ->
 			{noreply, StateAfterSend#state{player = PlayerId}};
 		false ->
 			StateAfterSend = add_message({login_invalid}, State),
-			{noreply, authentication_failed, StateAfterSend}
+			{noreply, StateAfterSend}
 	end;
 
 %% Makes the player do something on behalf of the client
@@ -243,8 +243,8 @@ add_message(Message, State) ->
 -define(meck_sdd_player,
 	meck:new(sdd_player),
 	meck:expect(sdd_player, authenticate, fun
-		("Peter", "GoodSecret") -> true;
-		("Peter", "BadSecret") -> false
+		("PeterSecret") -> {"Peter", "PeterId"};
+		("BadSecret") -> false
 	end),
 	meck:expect(sdd_player, register, fun
 		("PaulId", "Paul", _Secret) -> already_exists;
@@ -263,22 +263,16 @@ init_savesClientIdAndInfo_test() ->
 	?assertEqual("ClientId", InitialState#state.id),
 	?assertEqual("ClientInfo", InitialState#state.info).
 
-register_triesToRegisterPlayerAndConnectsIfSuccessful_test() ->
+register_triesToRegisterPlayer_test() ->
 	?meck_sdd_player,
 
 	InitialState = #state{id = "ClientId", info = "ClientInfo", player = undefined},
 
-	{reply, already_exists, StateAfterBadRegister} = handle_call({register, "PaulId", "Paul","Secret"}, from, InitialState),
-
+	{noreply, _StateAfterBadRegister} = handle_cast({register, "PaulId", "Paul","Secret"}, InitialState),
 	?assert(meck:called(sdd_player, register, ["PaulId", "Paul", "Secret"])),
-	?assertNot(meck:called(sdd_player, connect, ["PaulId", "ClientId", "ClientInfo"])),
-	?assertEqual(StateAfterBadRegister#state.player, undefined),
 
-	{reply, ok, StateAfterGoodRegister} = handle_call({register, "PetraId", "Petra","Secret"}, from, InitialState),
-
+	{noreply, _StateAfterGoodRegister} = handle_cast({register, "PetraId", "Petra","Secret"}, InitialState),
 	?assert(meck:called(sdd_player, register, ["PetraId", "Petra", "Secret"])),
-	?assert(meck:called(sdd_player, connect, ["PetraId", "ClientId", "ClientInfo"])),
-	?assertEqual(StateAfterGoodRegister#state.player, "PetraId"),
 
 	?assert(meck:validate(sdd_player)),
 	meck:unload(sdd_player).
@@ -288,17 +282,17 @@ login_authenticatesWithPlayerAndConnectsIfSuccessful_test() ->
 
 	InitialState = #state{id = "ClientId", info = "ClientInfo", player = undefined},
 
-	{reply, authentication_failed, StateAfterBadLogin} = handle_call({login, "Peter", "BadSecret"}, from, InitialState),
+	{noreply, StateAfterBadLogin} = handle_cast({login, "BadSecret"}, InitialState),
 
-	?assert(meck:called(sdd_player, authenticate, ["Peter", "BadSecret"])),
-	?assertNot(meck:called(sdd_player, connect, ["Peter", "ClientId", "ClientInfo"])),
+	?assert(meck:called(sdd_player, authenticate, ["BadSecret"])),
+	?assertNot(meck:called(sdd_player, connect, ["PeterId", "ClientId", "ClientInfo"])),
 	?assertEqual(StateAfterBadLogin#state.player, undefined),
 
-	{reply, ok, StateAfterGoodLogin} = handle_call({login, "Peter", "GoodSecret"}, from, InitialState),
+	{noreply, StateAfterGoodLogin} = handle_cast({login, "PeterSecret"}, InitialState),
 
-	?assert(meck:called(sdd_player, authenticate, ["Peter", "GoodSecret"])),
-	?assert(meck:called(sdd_player, connect, ["Peter", "ClientId", "ClientInfo"])),
-	?assertEqual(StateAfterGoodLogin#state.player, "Peter"),
+	?assert(meck:called(sdd_player, authenticate, ["PeterSecret"])),
+	?assert(meck:called(sdd_player, connect, ["PeterId", "ClientId", "ClientInfo"])),
+	?assertEqual(StateAfterGoodLogin#state.player, "PeterId"),
 
 	?assert(meck:validate(sdd_player)),
 	meck:unload(sdd_player).
@@ -352,7 +346,7 @@ game_do_forwardsActionToGameIfWeAreInOne_test() ->
 	?assertEqual(StateWithPlayerAndGame, StateAfterDoWithGame).
 
 sync_player_state_updatesCurrentGameAndForwardsStateToConnection_test() ->
-	{noreply, StateAfterSync} = handle_cast({sync_player_state, 3, "Badges", "GameA"}, #state{}),
+	{reply, continue_listening, StateAfterSync} = handle_call({sync_player_state, 3, "Badges", "GameA"}, from, #state{}),
 
 	?assertEqual("GameA", StateAfterSync#state.current_game),
 	?assertEqual([{sync_player_state, 3, "Badges", "GameA"}], StateAfterSync#state.messages).
