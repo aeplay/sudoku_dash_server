@@ -541,7 +541,7 @@ generate_sudoku() ->
 
 	BoardComplete = fill_board(Board0),
 
-	remove_inferrables(BoardComplete, 3, 81).
+	remove_inferrables(BoardComplete, 3, 70+random:uniform(10)).
 
 %% ------------------------------------------------------------------------------------- %%
 %% fill_board
@@ -621,7 +621,7 @@ remove_inferrables(Board, Sophistication, MaxHoles) ->
 			_MustBeGiven ->
 				BoardAcc
 		end
-	end, Board, lists:seq(MaxHoles div 2, 0, -1)).
+	end, Board, lists:seq(40, 40+(MaxHoles div 2), 1)).
 
 
 %%% =================================================================================== %%%

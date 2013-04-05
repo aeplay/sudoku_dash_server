@@ -151,11 +151,11 @@ realize_event(State, guess, {PlayerId, Position, Number, {good}}) ->
 	State#state{board = NewBoard, candidates = NewCandidates, complete = Complete};
 
 realize_event(State, guess, {PlayerId, _Position, _Number, {bad, Conflicts}}) ->
-	sdd_player:do(PlayerId, get_points, -1*length(Conflicts)),
+	sdd_player:do(PlayerId, get_points, -2*length(Conflicts)),
 	State;
 
 realize_event(State, guess, {PlayerId, _Position, _Number, {ambigous, _Reason}}) ->
-	sdd_player:do(PlayerId, get_points, -1),
+	sdd_player:do(PlayerId, get_points, -3),
 	State;
 
 %% Does not change state for all other used events
