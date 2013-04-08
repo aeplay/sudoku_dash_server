@@ -158,9 +158,9 @@ realize_event(State, guess, {PlayerId, _Position, _Number, {ambigous, _Reason}})
 	sdd_player:do(PlayerId, get_points, -3),
 	State;
 
-%% ignore other guess results
+%% ignore guess if field is already filled
 
-realize_event(State, guess, {_PlayerId, _Position, _Number, _}) ->
+realize_event(State, guess, {_PlayerId, _Position, _Number, {already_filled}}) ->
 	State;
 
 %% Does not change state for all other used events
@@ -282,7 +282,7 @@ guess_updatesBoardOnCorrectGuessAndGivesPlayerAPoint_test() ->
 
 	?history_assert_past_matches(HistoryAfterGuess, [{_Time, guess, {"Peter", 27, 1, {good}}} | _ ]).
 
-guess_addsGuessToHistoryButLeavesBoardAloneOnInvalidGuess_test() ->
+guess_addsGuessToHistoryAndPunishes2PerConflictOnInvalidGuess_test() ->
 	InitialBoard = array:from_list(
 		[4,1,6,5,2,0,8,9,3,
 		 5,9,2,8,3,6,1,4,7,
@@ -297,9 +297,31 @@ guess_addsGuessToHistoryButLeavesBoardAloneOnInvalidGuess_test() ->
 	DummyHistory = sdd_history:new(fun realize_event/3),
 	InitialHistory = sdd_history:append(DummyHistory, start, {"GameId", InitialBoard}),
 
+	?meck_sdd_player,
+
 	{noreply, HistoryAfterGuess} = handle_cast({guess, "Peter", {27, 3}}, InitialHistory),
+
+	?assert(meck:called(sdd_player, do, ["Peter", get_points, -6])),
+	?assert(meck:validate(sdd_player)),
+	meck:unload(sdd_player),
+
 	?history_assert_past_matches(HistoryAfterGuess, [{_Time, guess, {"Peter", 27, 3, {bad, _Conflicts}}} | _ ]),
 	?history_assert_states_equal(InitialHistory, HistoryAfterGuess).
+
+guess_punishes3OnAmbigous_test() ->
+	?meck_sdd_player,
+
+	StateAfterGuess = realize_event(dummy_state, guess, {"Peter", 33, 7, {ambigous, because_i_say_so}}),
+	
+	?assert(meck:called(sdd_player, do, ["Peter", get_points, -3])),
+	?assert(meck:validate(sdd_player)),
+	meck:unload(sdd_player),
+
+	?assertEqual(dummy_state, StateAfterGuess).
+
+
+guess_canHandleAlreadyFilledResult_test() ->	
+	?assertEqual(dummy_state, realize_event(dummy_state, guess, {"Peter", 33, 7, {already_filled}})).
 
 guess_markGameAsCompleteAndTimeoutIfComplete_test() ->
 	InitialBoard = array:from_list(
@@ -360,5 +382,19 @@ guess_ignoresGuessAfterComplete_test() ->
 
 game_stopsWhenRecievingCompleteTimeout_test() ->
 	?assertEqual({stop, normal, dummy_history}, handle_info(stop_complete, dummy_history)).
+
+terminate_persistsGameHistory_test() ->
+	meck:new(sdd_history),
+	meck:expect(sdd_history, state, fun(dummy_history) -> #state{id = "GameId"} end),
+	meck:expect(sdd_history, save_persisted, fun(_, _, _) -> {atomic, ok} end),
+
+	terminate("Reason", dummy_history),
+
+	?assert(meck:called(sdd_history, save_persisted, [game_history, "GameId", dummy_history])),
+	?assert(meck:validate(sdd_history)),
+	meck:unload(sdd_history).
+
+code_change_doesNothingRightNow_test() ->
+	?assertEqual({ok, dummy_history}, code_change(0, dummy_history, [])).
 
 -endif.
