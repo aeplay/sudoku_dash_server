@@ -23,7 +23,7 @@
 -ifdef(TEST).
 -define(MAX_PLAYERS_PER_GAME, 2).
 -else.
--define(MAX_PLAYERS_PER_GAME, 5).
+-define(MAX_PLAYERS_PER_GAME, 3).
 -endif.
 
 %%% =================================================================================== %%%
@@ -48,6 +48,10 @@ remove_game(GameId) ->
 
 init(_Opts) ->
 	{ok, #state{}}.
+
+%% ------------------------------------------------------------------------------------- %%
+%% Tries to rejoin a player in his current game, or to find a game, or to create a game
+
 
 handle_cast({find_game_and_join, PlayerId, PlayerInfo, CurrentGame}, State) ->
 	StateAfterLeave = leave(PlayerId, CurrentGame, rejoin, State),
@@ -159,6 +163,57 @@ leave(PlayerId, GameId, Reason, State) ->
 	meck:new(sdd_games_sup),
 	meck:expect(sdd_games_sup, start_game, fun(_GameId) -> ok end)
 ).
+
+init_initializes_test() ->
+	?assertEqual({ok, #state{}}, init([])).
+
+find_game_and_join_triesToRejoinAPlayerToHisCurrentGame_test() ->
+	?meck_sdd_game,
+
+	InitialState = #state{games=[{"OldGame", 0}]},
+
+	handle_cast({find_game_and_join, "Peter", "PeterInfo", "OldGame"}, InitialState),
+	?assert(meck:called(sdd_game, do, ["OldGame", "Peter", leave, rejoin])),
+	?assert(meck:called(sdd_game, join, ["OldGame", "Peter", "PeterInfo", rejoin])),
+
+	?assert(meck:validate(sdd_game)),
+	meck:unload(sdd_game).
+
+find_game_and_join_triesToJoinAPlayerToAnOpenGame_test() ->
+	?meck_sdd_game,
+
+	InitialState = #state{games=[{"FullGame", 5}, {"OpenGame", 0}]},
+
+	handle_cast({find_game_and_join, "Peter", "PeterInfo", "OldGame"}, InitialState),
+	?assert(meck:called(sdd_game, join, ["OpenGame", "Peter", "PeterInfo", random])),
+
+	InitialState2 = #state{games=[{"FullGame", 5}, {"OpenGame1", 0}, {"OpenGame2", 0}]},
+
+	handle_cast({find_game_and_join, "Peter", "PeterInfo", "OldGame"}, InitialState2),
+	?assert(meck:called(sdd_game, join, ["OpenGame1", "Peter", "PeterInfo", random])),
+
+	?assert(meck:validate(sdd_game)),
+	meck:unload(sdd_game).
+
+find_game_and_join_createsANewGameIfThereAreNoOpenGames_test() ->
+	?meck_sdd_game,
+	?meck_sdd_games_sup,
+
+	InitialState = #state{games=[{"FullGame1", 5}, {"FullGame2", 4}]},
+
+	{noreply, StateAfterJoin} = handle_cast({find_game_and_join, "Peter", "PeterInfo", "OldGame"}, InitialState),
+	#state{games=[{NewGame, 1} | _OldGames]} = StateAfterJoin,
+	?assert(meck:called(sdd_game, join, [NewGame, "Peter", "PeterInfo", random])),
+
+	?assert(meck:validate(sdd_game)),
+	meck:unload(sdd_game),
+	meck:unload(sdd_games_sup).
+
+remove_game_removesAGames_test() ->
+	InitialState = #state{games=[{"GameA", 0}, {"GameB", 0}]},
+
+	{noreply, StateAfterRemove} = handle_cast({remove_game, "GameA"}, InitialState),
+	?assertEqual(#state{games=[{"GameB", 0}]}, StateAfterRemove).
 
 create_game_startsGameAndRegistersIt_test() ->
 	?meck_sdd_games_sup,
