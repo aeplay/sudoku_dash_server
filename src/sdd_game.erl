@@ -158,6 +158,11 @@ realize_event(State, guess, {PlayerId, _Position, _Number, {ambigous, _Reason}})
 	sdd_player:do(PlayerId, get_points, -3),
 	State;
 
+%% ignore other guess results
+
+realize_event(State, guess, {_PlayerId, _Position, _Number, _}) ->
+	State;
+
 %% Does not change state for all other used events
 
 realize_event(State, chat, _) -> State;
