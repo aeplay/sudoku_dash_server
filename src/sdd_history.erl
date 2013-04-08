@@ -244,6 +244,10 @@ append_NotifiesListenersAndRemovesOnesThatAreUninterested_test() ->
 	meck:expect(mnesia, read, fun
 		(_Table, nonexisting_id) -> [];
 		(_Table, existing_id) -> [#persisted_history{id = existing_id, state = existing_state, past = existing_past}]
+	end),
+	meck:expect(mnesia, match_object, fun
+		(_TableName, #persisted_history{state=good_pattern}, _Mode) -> [#persisted_history{state=dummy_state}];
+		(_TableName, #persisted_history{state=bad_pattern}, _Mode) -> []
 	end)
 ).
 
@@ -304,6 +308,20 @@ persisted_state_returnsTheStateOfApersistedHistoryIfItExists_test() ->
 	ExistingState = persisted_state(history_type, existing_id),
 	?assertEqual(existing_state, ExistingState),
 	?assert(meck:called(mnesia, read, [history_type, existing_id])),
+
+	?assert(meck:validate(mnesia)),
+	meck:unload(mnesia).
+
+persisted_state_by_match_returnsStateOfHistoryWhereStateMatchesPattern_test() ->
+	?meck_mnesia,
+
+	MatchingState = persisted_state_by_match(history_type, good_pattern),
+
+	?assertEqual(dummy_state, MatchingState),
+	?assert(meck:called(mnesia, match_object, [history_type, #persisted_history{id='_', past='_', state=good_pattern}, read])),
+
+	NoMatchingState = persisted_state_by_match(history_type, bad_pattern),
+	?assertEqual(doesnt_exist, NoMatchingState),
 
 	?assert(meck:validate(mnesia)),
 	meck:unload(mnesia).
