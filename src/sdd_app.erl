@@ -10,14 +10,18 @@
 %%% =================================================================================== %%%
 
 start(_StartType, _StartArgs) ->
-	Dispatch = cowboy_router:compile([
+	Port = 2739,
+	SockjsState = sockjs_handler:init_state(<<"/realtime">>, fun sdd_sockjs_handler:handle/3, undefined, []),
+	Routes = [
 		{'_', [
-			{"/realtime", bullet_handler, [{handler, sdd_bullet_handler}]}
+			{[<<"realtime">>, '...'], sockjs_cowboy_handler, SockjsState}
 		]}
-	]),
-	{ok, _} = cowboy:start_http(http, 100,
-		[{port, 2739}], [{env, [{dispatch, Dispatch}]}]
+	],
+	{ok, _} = cowboy:start_listener(http, 100,
+		cowboy_tcp_transport, [{port, Port}],
+		cowboy_http_protocol, [{dispatch, Routes}]
 	),
+	io:format("SockJS running on port ~p~n", [Port]),
 	sdd_sup:start_link().
 
 stop(_State) ->
